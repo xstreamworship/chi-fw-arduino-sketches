@@ -8,6 +8,8 @@
 // See the LICENSE file for license terms.
 /////////////////////////////////////////////////////////////////////
 #include "Wire.h"
+#include <MIDI.h>
+
 #include "Cat9555.h"
 #include "MidiKeySwitch.h"
 #include "Ad7997.h"
@@ -46,10 +48,10 @@ const PROGMEM char joystickStr1[] = "JoyY";
 const PROGMEM char joystickStr2[] = "JoyZ";
 const PROGMEM CFilter joysticks[] =
 {
-  //      name        debounce  thresh  origin ormrgn min   mnmrgn max   mxmrgn
-  CFilter(joystickStr0, 30000,   16,     2048,   128,    0,     16,  4096,  32),
-  CFilter(joystickStr1, 30000,   16,     2048,   128,    0,     16,  4096,  32),
-  CFilter(joystickStr2, 30000,   16,     2048,   128,    0,     16,  4096,  32),
+  //      name          thresh  origin ormrgn min   mnmrgn max   mxmrgn
+  CFilter(joystickStr0,   16,     2048,   128,    0,     16,  4096,  32),
+  CFilter(joystickStr1,   16,     2048,   128,    0,     16,  4096,  32),
+  CFilter(joystickStr2,   16,     2048,   128,    0,     16,  4096,  32),
 };
 
 // Analog filters for foot controllers.
@@ -57,9 +59,9 @@ const PROGMEM char footCtrlStr0[] = "FC1";
 const PROGMEM char footCtrlStr1[] = "FC2";
 const PROGMEM CFilter footCtrls[] =
 {
-  //      name        debounce  thresh  origin ormrgn min   mnmrgn max   mxmrgn
-  CFilter(footCtrlStr0, 30000,   16,     530,     32,    0,     16,  4096,  64),
-  CFilter(footCtrlStr1, 30000,   16,     530,     32,    0,     16,  4096,  64),
+  //      name          thresh  origin ormrgn min   mnmrgn max   mxmrgn
+  CFilter(footCtrlStr0,   16,     530,     32,    0,     16,  4096,  64),
+  CFilter(footCtrlStr1,   16,     530,     32,    0,     16,  4096,  64),
 };
 
 // Analog filters for control dials on panel.
@@ -68,10 +70,10 @@ const PROGMEM char dialStr1[] = "Brilliance";
 const PROGMEM char dialStr2[] = "Trem Rate";
 const PROGMEM CFilter dialCtrls[] =
 {
-  //      name     debounce  thresh  origin ormrgn min   mnmrgn max   mxmrgn
-  CFilter(dialStr0, 30000,   16,     0,     32,    0,     16,  4096,  32),
-  CFilter(dialStr1, 30000,   16,     0,     32,    0,     16,  4096,  32),
-  CFilter(dialStr2, 30000,   16,     0,     32,    0,     16,  4096,  32),
+  //      name       thresh  origin ormrgn min   mnmrgn max   mxmrgn
+  CFilter(dialStr0,   16,     0,     32,    0,     16,  4096,  32),
+  CFilter(dialStr1,   16,     0,     32,    0,     16,  4096,  32),
+  CFilter(dialStr2,   16,     0,     32,    0,     16,  4096,  32),
 };
 
 // Logical switch scanner.
@@ -79,11 +81,11 @@ const PROGMEM char footSwitchesStr0[] = "Damper";
 const PROGMEM char footSwitchesStr1[] = "Soft";
 const PROGMEM CSwitch footSwitches[] =
 {
-  CSwitch(footSwitchesStr0, 30000),
-  CSwitch(footSwitchesStr1, 30000),
+  CSwitch(footSwitchesStr0),
+  CSwitch(footSwitchesStr1),
 };
 const PROGMEM char modeSwitchStr[] = "Mode";
-const PROGMEM CSwitch modeSwitch(modeSwitchStr, 30000);
+const PROGMEM CSwitch modeSwitch(modeSwitchStr);
 const PROGMEM char switchLedMatrixStr0[] = "Trans";
 const PROGMEM char switchLedMatrixStr1[] = "Clav";
 const PROGMEM char switchLedMatrixStr2[] = "P1";
@@ -98,88 +100,119 @@ const PROGMEM char switchLedMatrixStr10[] = "Ep2";
 const PROGMEM char switchLedMatrixStr11[] = "Harp";
 const PROGMEM CSwitch switchLedMatrix[] =
 {
-  CSwitch(switchLedMatrixStr0, 20000),
-  CSwitch(switchLedMatrixStr1, 20000),
-  CSwitch(switchLedMatrixStr2, 20000),
-  CSwitch(switchLedMatrixStr3, 20000),
-  CSwitch(switchLedMatrixStr4, 20000),
-  CSwitch(switchLedMatrixStr5, 20000),
-  CSwitch(switchLedMatrixStr6, 20000),
-  CSwitch(switchLedMatrixStr7, 20000),
-  CSwitch(switchLedMatrixStr8, 20000),
-  CSwitch(switchLedMatrixStr9, 20000),
-  CSwitch(switchLedMatrixStr10, 20000),
-  CSwitch(switchLedMatrixStr11, 20000),
+  CSwitch(switchLedMatrixStr0),
+  CSwitch(switchLedMatrixStr1),
+  CSwitch(switchLedMatrixStr2),
+  CSwitch(switchLedMatrixStr3),
+  CSwitch(switchLedMatrixStr4),
+  CSwitch(switchLedMatrixStr5),
+  CSwitch(switchLedMatrixStr6),
+  CSwitch(switchLedMatrixStr7),
+  CSwitch(switchLedMatrixStr8),
+  CSwitch(switchLedMatrixStr9),
+  CSwitch(switchLedMatrixStr10),
+  CSwitch(switchLedMatrixStr11),
 };
 const PROGMEM char joystickButtonStr[] = "JSButton";
-const PROGMEM CSwitch joystickButton(joystickButtonStr, 20000);
+const PROGMEM CSwitch joystickButton(joystickButtonStr);
 const PROGMEM char rotarySwStr0[] = "RotSlow";
 const PROGMEM char rotarySwStr1[] = "RotFast";
 const PROGMEM CSwitch rotarySw[] =
 {
-  CSwitch(rotarySwStr0, 30000),
-  CSwitch(rotarySwStr1, 30000),
+  CSwitch(rotarySwStr0),
+  CSwitch(rotarySwStr1),
 };
 const PROGMEM char midiCableDetectStr[] = "MIDICable";
-const PROGMEM CSwitch midiCableDetect(midiCableDetectStr, 30000);
+const PROGMEM CSwitch midiCableDetect(midiCableDetectStr);
 
 // Logical MIDI keyboard scanning.
-const PROGMEM char NoteAStr[] = "A";
-const PROGMEM char NoteBbStr[] = "A#/Bb";
-const PROGMEM char NoteBStr[] = "B";
-const PROGMEM char NoteCStr[] = "C";
-const PROGMEM char NoteDbStr[] = "C#/Db";
-const PROGMEM char NoteDStr[] = "D";
-const PROGMEM char NoteEbStr[] = "D#/Eb";
-const PROGMEM char NoteEStr[] = "E";
-const PROGMEM char NoteFStr[] = "F";
-const PROGMEM char NoteGbStr[] = "F#/Gb";
-const PROGMEM char NoteGStr[] = "G";
-const PROGMEM char NoteAbStr[] = "G#/Ab";
+const PROGMEM char NoteA1Str[] = "A1";
+const PROGMEM char NoteBb1Str[] = "A#/Bb1";
+const PROGMEM char NoteB1Str[] = "B1";
+const PROGMEM char NoteC2Str[] = "C2";
+const PROGMEM char NoteDb2Str[] = "C#/Db2";
+const PROGMEM char NoteD2Str[] = "D2";
+const PROGMEM char NoteEb2Str[] = "D#/Eb2";
+const PROGMEM char NoteE2Str[] = "E2";
+const PROGMEM char NoteF2Str[] = "F2";
+const PROGMEM char NoteGb2Str[] = "F#/Gb2";
+const PROGMEM char NoteG2Str[] = "G2";
+const PROGMEM char NoteAb2Str[] = "G#/Ab2";
+const PROGMEM char NoteA2Str[] = "A2";
+const PROGMEM char NoteBb2Str[] = "A#/Bb2";
+const PROGMEM char NoteB2Str[] = "B2";
+const PROGMEM char NoteC3Str[] = "C3";
+const PROGMEM char NoteDb3Str[] = "C#/Db3";
+const PROGMEM char NoteD3Str[] = "D3";
+const PROGMEM char NoteEb3Str[] = "D#/Eb3";
+const PROGMEM char NoteE3Str[] = "E3";
+const PROGMEM char NoteF3Str[] = "F3";
+const PROGMEM char NoteGb3Str[] = "F#/Gb3";
+const PROGMEM char NoteG3Str[] = "G3";
+const PROGMEM char NoteAb3Str[] = "G#/Ab3";
+const PROGMEM char NoteA3Str[] = "A3";
+const PROGMEM char NoteBb3Str[] = "A#/Bb3";
+const PROGMEM char NoteB3Str[] = "B3";
+const PROGMEM char NoteC4Str[] = "C4";
+const PROGMEM char NoteDb4Str[] = "C#/Db4";
+const PROGMEM char NoteD4Str[] = "D4";
+const PROGMEM char NoteEb4Str[] = "D#/Eb4";
+const PROGMEM char NoteE4Str[] = "E4";
+const PROGMEM char NoteF4Str[] = "F4";
+const PROGMEM char NoteGb4Str[] = "F#/Gb4";
+const PROGMEM char NoteG4Str[] = "G4";
+const PROGMEM char NoteAb4Str[] = "G#/Ab4";
+const PROGMEM char NoteA4Str[] = "A4";
+const PROGMEM char NoteBb4Str[] = "A#/Bb4";
+const PROGMEM char NoteB4Str[] = "B4";
+const PROGMEM char NoteC5Str[] = "C5";
 
 const PROGMEM CMidiKeySwitch keyboard[] =
 {
-  CMidiKeySwitch(45, NoteAStr, 1),
-  CMidiKeySwitch(46, NoteBbStr, 1),
-  CMidiKeySwitch(47, NoteBStr, 1),
-  CMidiKeySwitch(48, NoteCStr, 2),
-  CMidiKeySwitch(49, NoteDbStr, 2),
-  CMidiKeySwitch(50, NoteDStr, 2),
-  CMidiKeySwitch(51, NoteEbStr, 2),
-  CMidiKeySwitch(52, NoteEStr, 2),
-  CMidiKeySwitch(53, NoteFStr, 2),
-  CMidiKeySwitch(54, NoteGbStr, 2),
-  CMidiKeySwitch(55, NoteGStr, 2),
-  CMidiKeySwitch(56, NoteAbStr, 2),
-  CMidiKeySwitch(57, NoteAStr, 2),
-  CMidiKeySwitch(58, NoteBbStr, 2),
-  CMidiKeySwitch(59, NoteBStr, 2),
-  CMidiKeySwitch(60, NoteCStr, 3),
-  CMidiKeySwitch(61, NoteDbStr, 3),
-  CMidiKeySwitch(62, NoteDStr, 3),
-  CMidiKeySwitch(63, NoteEbStr, 3),
-  CMidiKeySwitch(64, NoteEStr, 3),
-  CMidiKeySwitch(65, NoteFStr, 3),
-  CMidiKeySwitch(66, NoteGbStr, 3),
-  CMidiKeySwitch(67, NoteGStr, 3),
-  CMidiKeySwitch(68, NoteAbStr, 3),
-  CMidiKeySwitch(69, NoteAStr, 3),
-  CMidiKeySwitch(70, NoteBbStr, 3),
-  CMidiKeySwitch(71, NoteBStr, 3),
-  CMidiKeySwitch(72, NoteCStr, 4),
-  CMidiKeySwitch(73, NoteDbStr, 4),
-  CMidiKeySwitch(74, NoteDStr, 4),
-  CMidiKeySwitch(75, NoteEbStr, 4),
-  CMidiKeySwitch(76, NoteEStr, 4),
-  CMidiKeySwitch(77, NoteFStr, 4),
-  CMidiKeySwitch(78, NoteGbStr, 4),
-  CMidiKeySwitch(79, NoteGStr, 4),
-  CMidiKeySwitch(80, NoteAbStr, 4),
-  CMidiKeySwitch(81, NoteAStr, 4),
-  CMidiKeySwitch(82, NoteBbStr, 4),
-  CMidiKeySwitch(83, NoteBStr, 4),
-  CMidiKeySwitch(84, NoteCStr, 5),
+  CMidiKeySwitch(NoteA1Str),
+  CMidiKeySwitch(NoteBb1Str),
+  CMidiKeySwitch(NoteB1Str),
+  CMidiKeySwitch(NoteC2Str),
+  CMidiKeySwitch(NoteDb2Str),
+  CMidiKeySwitch(NoteD2Str),
+  CMidiKeySwitch(NoteEb2Str),
+  CMidiKeySwitch(NoteE2Str),
+  CMidiKeySwitch(NoteF2Str),
+  CMidiKeySwitch(NoteGb2Str),
+  CMidiKeySwitch(NoteG2Str),
+  CMidiKeySwitch(NoteAb2Str),
+  CMidiKeySwitch(NoteA2Str),
+  CMidiKeySwitch(NoteBb2Str),
+  CMidiKeySwitch(NoteB2Str),
+  CMidiKeySwitch(NoteC3Str),
+  CMidiKeySwitch(NoteDb3Str),
+  CMidiKeySwitch(NoteD3Str),
+  CMidiKeySwitch(NoteEb3Str),
+  CMidiKeySwitch(NoteE3Str),
+  CMidiKeySwitch(NoteF3Str),
+  CMidiKeySwitch(NoteGb3Str),
+  CMidiKeySwitch(NoteG3Str),
+  CMidiKeySwitch(NoteAb3Str),
+  CMidiKeySwitch(NoteA3Str),
+  CMidiKeySwitch(NoteBb3Str),
+  CMidiKeySwitch(NoteB3Str),
+  CMidiKeySwitch(NoteC4Str),
+  CMidiKeySwitch(NoteDb4Str),
+  CMidiKeySwitch(NoteD4Str),
+  CMidiKeySwitch(NoteEb4Str),
+  CMidiKeySwitch(NoteE4Str),
+  CMidiKeySwitch(NoteF4Str),
+  CMidiKeySwitch(NoteGb4Str),
+  CMidiKeySwitch(NoteG4Str),
+  CMidiKeySwitch(NoteAb4Str),
+  CMidiKeySwitch(NoteA4Str),
+  CMidiKeySwitch(NoteBb4Str),
+  CMidiKeySwitch(NoteB4Str),
+  CMidiKeySwitch(NoteC5Str),
 };
+
+//MIDI_CREATE_DEFAULT_INSTANCE();
+
 
 // Regular scanning of input switches.
 void scan_switches(void)
@@ -276,18 +309,23 @@ void kbd_scan_keys_this_column(void)
 {
   // Scan the rows.
   keyboard[kbd_scan_column_index].scan(      // Row A
+    kbd_scan_column_index,
     (RegTS.read() & 0x0010) == 0,
     (RegTS.read() & 0x0020) == 0);
   keyboard[kbd_scan_column_index + 8].scan(  // Row B
+    kbd_scan_column_index + 8,
     (RegRQ.read() & 0x0100) == 0,
     (RegRQ.read() & 0x0200) == 0);
   keyboard[kbd_scan_column_index + 16].scan( // Row C
+    kbd_scan_column_index + 16,
     (RegRQ.read() & 0x0400) == 0,
     (RegRQ.read() & 0x0800) == 0);
   keyboard[kbd_scan_column_index + 24].scan( // Row D
+    kbd_scan_column_index + 24,
     (RegRQ.read() & 0x1000) == 0,
     (RegRQ.read() & 0x2000) == 0);
   keyboard[kbd_scan_column_index + 32].scan( // Row E
+    kbd_scan_column_index + 32,
     (RegRQ.read() & 0x4000) == 0,
     (RegRQ.read() & 0x8000) == 0);
 
@@ -389,3 +427,4 @@ void loop()
   AnalogA.sync();
   scan_analogs();
 }
+

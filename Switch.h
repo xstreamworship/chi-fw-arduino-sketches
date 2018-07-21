@@ -12,11 +12,9 @@
 
 #include "Arduino.h"
 
-class CSwitchS
+class CSwitch
 {
-  public:
-    CSwitchS(void);
-    ~CSwitchS(void);
+  private:
     enum state
     {
       E_SW_OFF,
@@ -24,27 +22,23 @@ class CSwitchS
       E_SW_ON,
       E_SW_VALIDATING_OFF,
     };
-    enum state m_state;
     unsigned long m_timeStart;
+    enum state m_state;
     bool m_ledState;
-};
-
-class CSwitch
-{
-  private:
-    const PROGMEM char *m_switchName;
-    const PROGMEM unsigned long m_timeDebounce;
-    CSwitchS * const PROGMEM m_S;
+    char * const PROGMEM m_switchName;
+    enum
+    {
+      E_TIMEDEBOUNCE = 30000,
+    };
 
   public:
-    CSwitch(const PROGMEM char *switchName, const PROGMEM unsigned long timeDebounce);
-    CSwitch(const PROGMEM char *switchName, const PROGMEM unsigned long timeDebounce, const PROGMEM CSwitchS * css);
+    CSwitch(const PROGMEM char *switchName);
     ~CSwitch(void);
     void scan(bool state);
     void switchOn(void);
     void switchOff(void);
-    bool ledState(void) { return m_S->m_ledState; }
-    void setLedState(bool state) { m_S->m_ledState = state; }
+    bool ledState(void) { return m_ledState; }
+    void setLedState(bool state) { m_ledState = state; }
     void ledOn(void) { setLedState(true); }
     void ledOff(void) { setLedState(false); }
 };

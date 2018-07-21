@@ -10,28 +10,11 @@
 #include "Arduino.h"
 #include "Switch.h"
 
-CSwitchS::CSwitchS(void) :
+CSwitch::CSwitch(const PROGMEM char *switchName) :
+  m_switchName(switchName),
   m_state(E_SW_OFF),
   m_timeStart(0),
   m_ledState(false)
-{
-}
-
-CSwitchS::~CSwitchS(void)
-{
-}
-
-CSwitch::CSwitch(const PROGMEM char *switchName, const PROGMEM unsigned long timeDebounce) :
-  m_switchName(switchName),
-  m_timeDebounce(timeDebounce),
-  m_S(new CSwitchS())
-{
-}
-
-CSwitch::CSwitch(const PROGMEM char *switchName, const PROGMEM unsigned long timeDebounce, const PROGMEM CSwitchS * css) :
-  m_switchName(switchName),
-  m_timeDebounce(timeDebounce),
-  m_S(css)
 {
 }
 
@@ -44,26 +27,26 @@ void CSwitch::scan(bool state)
   if (state)
   {
     // On or just turned on.
-    switch (m_S->m_state)
+    switch (m_state)
     {
-      case CSwitchS::E_SW_ON:
+      case E_SW_ON:
         // Do nothing.
         break;
-      case CSwitchS::E_SW_VALIDATING_OFF:
+      case E_SW_VALIDATING_OFF:
         // False off - cancel it.
-        m_S->m_state = CSwitchS::E_SW_ON;
+        m_state = E_SW_ON;
         break;
-      case CSwitchS::E_SW_OFF:
+      case E_SW_OFF:
       default:
         // Transition from off to on.
-        m_S->m_timeStart = micros();
-        m_S->m_state = CSwitchS::E_SW_VALIDATING_ON;
+        m_timeStart = micros();
+        m_state = E_SW_VALIDATING_ON;
         // fall through
-      case CSwitchS::E_SW_VALIDATING_ON:
+      case E_SW_VALIDATING_ON:
         // Complete the off
-        if ((micros() - m_S->m_timeStart) >= m_timeDebounce) {
+        if ((micros() - m_timeStart) >= E_TIMEDEBOUNCE) {
           switchOn();
-          m_S->m_state = CSwitchS::E_SW_ON;
+          m_state = E_SW_ON;
         }
         break;
     }
@@ -71,26 +54,26 @@ void CSwitch::scan(bool state)
   else
   {
     // Off or just turned off.
-    switch (m_S->m_state)
+    switch (m_state)
     {
-      case CSwitchS::E_SW_OFF:
+      case E_SW_OFF:
         // Do nothing.
         break;
-      case CSwitchS::E_SW_VALIDATING_ON:
+      case E_SW_VALIDATING_ON:
         // False on - cancel it.
-        m_S->m_state = CSwitchS::E_SW_OFF;
+        m_state = E_SW_OFF;
         break;
-      case CSwitchS::E_SW_ON:
+      case E_SW_ON:
       default:
         // Transition from on to off.
-        m_S->m_timeStart = micros();
-        m_S->m_state = CSwitchS::E_SW_VALIDATING_OFF;
+        m_timeStart = micros();
+        m_state = E_SW_VALIDATING_OFF;
         // fall through
-      case CSwitchS::E_SW_VALIDATING_OFF:
+      case E_SW_VALIDATING_OFF:
         // Complete the off
-        if ((micros() - m_S->m_timeStart) >= m_timeDebounce) {
+        if ((micros() - m_timeStart) >= E_TIMEDEBOUNCE) {
           switchOff();
-          m_S->m_state = CSwitchS::E_SW_OFF;
+          m_state = E_SW_OFF;
         }
         break;
     }

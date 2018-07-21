@@ -12,11 +12,16 @@
 
 #include "Arduino.h"
 
-class CMidiKeySwitchS
+class CMidiKeySwitch
 {
-  public:
-    CMidiKeySwitchS(void);
-    ~CMidiKeySwitchS(void);
+  private:
+    unsigned long m_timeStart;
+    char * const PROGMEM m_noteName;
+    enum properties
+    {
+      E_DEFAULT_VELOCITY = 64,
+      E_NOTE_A1_OFFSET = 45,
+    };
     enum state
     {
       E_NOTE_OFF,
@@ -25,31 +30,13 @@ class CMidiKeySwitchS
       E_NO_OPENED,
     };
     enum state m_state;
-    unsigned long m_timeStart;
-    unsigned long m_timeTransition;
-    uint8_t m_velocity;
-    //unsigned m_errCount;
-};
-
-class CMidiKeySwitch
-{
-  private:
-    const PROGMEM uint8_t m_note;
-    const PROGMEM uint8_t m_noteOctave;
-    const PROGMEM char *m_noteName;
-    enum properties
-    {
-      E_DEFAULT_VELOCITY = 64
-    };
-    CMidiKeySwitchS * const PROGMEM m_S;
 
   public:
-    CMidiKeySwitch(const PROGMEM uint8_t note, const PROGMEM char *noteName, const PROGMEM uint8_t noteOctave);
-    CMidiKeySwitch(const PROGMEM uint8_t note, const PROGMEM char *noteName, const PROGMEM uint8_t noteOctave, const PROGMEM CMidiKeySwitchS * css);
+    CMidiKeySwitch(char * const PROGMEM noteName);
     ~CMidiKeySwitch(void);
-    void scan(bool nc, bool no);
-    void noteOn(void);
-    void noteOff(void);
+    void scan(uint8_t key, bool nc, bool no);
+    void noteOn(uint8_t note, unsigned long ttime);
+    void noteOff(uint8_t note, unsigned long ttime);
 };
 
 #endif
