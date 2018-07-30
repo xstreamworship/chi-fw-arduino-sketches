@@ -30,13 +30,22 @@ class CMidiKeySwitch
       E_NO_OPENED,
     };
     enum state m_state;
+    static uint8_t s_midi_ch;
+    static unsigned long s_glitchCount;
+    void noteOn(uint8_t note, unsigned long ttime);
+    void noteOff(uint8_t note, unsigned long ttime);
+    uint8_t velInterp(unsigned long ttime, unsigned long toptime, unsigned long bottime, uint8_t topvel, uint8_t botvel)
+    {
+      return ((ttime - bottime) * (topvel - botvel) / (toptime - bottime)) + botvel;
+    }
+    void stateError(uint8_t note, unsigned long ttime, uint8_t key, bool nc, bool no);
 
   public:
     CMidiKeySwitch(char * const PROGMEM noteName);
     ~CMidiKeySwitch(void);
+    static inline uint8_t getMidiCh(void) { return s_midi_ch; }
     void scan(uint8_t key, bool nc, bool no);
-    void noteOn(uint8_t note, unsigned long ttime);
-    void noteOff(uint8_t note, unsigned long ttime);
 };
 
 #endif
+

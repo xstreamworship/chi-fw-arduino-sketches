@@ -8,7 +8,10 @@
 // See the LICENSE file for license terms.
 /////////////////////////////////////////////////////////////////////
 #include "Arduino.h"
+
 #include "Filter.h"
+
+extern bool debug_mode;
 
 CFilter::CFilter(const PROGMEM char *filterName, const PROGMEM uint16_t thresh,
       const PROGMEM uint16_t origin, const PROGMEM uint16_t originMargin, const PROGMEM uint16_t minv,
@@ -93,29 +96,33 @@ void CFilter::scan(int sample)
 
 void CFilter::changed(void)
 {
-  char mbuffer[12];
-  Serial.print(F("Filter: "));
-  strncpy_P(mbuffer, m_filterName, sizeof(mbuffer) - 1);
-  Serial.print(mbuffer);
-  switch (m_region)
-  {
-    case E_FILT_AT_ORIGIN:
-      Serial.println(F(" origin"));
-      break;
-    case E_FILT_AT_MIN:
-      Serial.println(F(" min"));
-      break;
-    case E_FILT_IN_LOWER_REGION:
-      Serial.print(F(" lower: "));
-      Serial.println(m_lastValue);
-      break;
-    case E_FILT_AT_MAX:
-      Serial.println(F(" max"));
-      break;
-    case E_FILT_IN_UPPER_REGION:
-      Serial.print(F(" upper: "));
-      Serial.println(m_lastValue);
-      break;
-  } 
+  if (!debug_mode) {
+    // Using serial for MIDI.
+  } else {
+    char mbuffer[12];
+    Serial.print(F("Filter: "));
+    strncpy_P(mbuffer, m_filterName, sizeof(mbuffer) - 1);
+    Serial.print(mbuffer);
+    switch (m_region)
+    {
+      case E_FILT_AT_ORIGIN:
+        Serial.println(F(" origin"));
+        break;
+      case E_FILT_AT_MIN:
+        Serial.println(F(" min"));
+        break;
+      case E_FILT_IN_LOWER_REGION:
+        Serial.print(F(" lower: "));
+        Serial.println(m_lastValue);
+        break;
+      case E_FILT_AT_MAX:
+        Serial.println(F(" max"));
+        break;
+      case E_FILT_IN_UPPER_REGION:
+        Serial.print(F(" upper: "));
+        Serial.println(m_lastValue);
+        break;
+    }
+  }
 }
 

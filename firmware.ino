@@ -8,17 +8,17 @@
 // See the LICENSE file for license terms.
 /////////////////////////////////////////////////////////////////////
 #include "Wire.h"
-#include <MIDI.h>
 
 #include "Cat9555.h"
 #include "MidiKeySwitch.h"
 #include "Ad7997.h"
 #include "Switch.h"
 #include "Filter.h"
+#include "MidiPort.h"
 
 // Constants
-long ledBlinkInterval = 250; // ms
-const long wireClockFrequency = 400000; // Hz - I2C fast mode
+long ledBlinkInterval = 300; // ms
+const long wireClockFrequency = 800000; // Hz - I2C overclocked to 800kHz
 
 // Arduino I/O pin addresses
 const int ledPin =  LED_BUILTIN; // pin address
@@ -31,8 +31,9 @@ const uint16_t REG_RQ_PORT_CONFIG = 0xff00;
 const uint16_t REG_TS_PORT_CONFIG = 0x01ff;
 
 // Variables
-int ledState = LOW; // used to set the LED
+bool ledState = LOW; // used to set the LED
 unsigned long ledPreviousMillis = 0; // will store last time LED was updated
+bool debug_mode;
 
 // Analogue Inputs
 CAd7997 AnalogA(34); // I2C address
@@ -42,38 +43,26 @@ CAd7997 AnalogA(34); // I2C address
 CCat9555 RegRQ(32, REG_RQ_PORT_CONFIG); // I2C address and port config
 CCat9555 RegTS(33, REG_TS_PORT_CONFIG); // I2C address and port config
 
-// Analog filters for joystick.
-const PROGMEM char joystickStr0[] = "JoyX";
-const PROGMEM char joystickStr1[] = "JoyY";
-const PROGMEM char joystickStr2[] = "JoyZ";
-const PROGMEM CFilter joysticks[] =
+// Analog filters
+const PROGMEM char AnalogFilterStr0[] = "Trem Rate";
+const PROGMEM char AnalogFilterStr1[] = "FC2";
+const PROGMEM char AnalogFilterStr2[] = "Brilliance";
+const PROGMEM char AnalogFilterStr3[] = "FC1";
+const PROGMEM char AnalogFilterStr4[] = "Volume";
+const PROGMEM char AnalogFilterStr5[] = "JoyZ";
+const PROGMEM char AnalogFilterStr6[] = "JoyX";
+const PROGMEM char AnalogFilterStr7[] = "JoyY";
+const PROGMEM CFilter analogFilters[] =
 {
-  //      name          thresh  origin ormrgn min   mnmrgn max   mxmrgn
-  CFilter(joystickStr0,   16,     2048,   128,    0,     16,  4096,  32),
-  CFilter(joystickStr1,   16,     2048,   128,    0,     16,  4096,  32),
-  CFilter(joystickStr2,   16,     2048,   128,    0,     16,  4096,  32),
-};
-
-// Analog filters for foot controllers.
-const PROGMEM char footCtrlStr0[] = "FC1";
-const PROGMEM char footCtrlStr1[] = "FC2";
-const PROGMEM CFilter footCtrls[] =
-{
-  //      name          thresh  origin ormrgn min   mnmrgn max   mxmrgn
-  CFilter(footCtrlStr0,   16,     530,     32,    0,     16,  4096,  64),
-  CFilter(footCtrlStr1,   16,     530,     32,    0,     16,  4096,  64),
-};
-
-// Analog filters for control dials on panel.
-const PROGMEM char dialStr0[] = "Volume";
-const PROGMEM char dialStr1[] = "Brilliance";
-const PROGMEM char dialStr2[] = "Trem Rate";
-const PROGMEM CFilter dialCtrls[] =
-{
-  //      name       thresh  origin ormrgn min   mnmrgn max   mxmrgn
-  CFilter(dialStr0,   16,     0,     32,    0,     16,  4096,  32),
-  CFilter(dialStr1,   16,     0,     32,    0,     16,  4096,  32),
-  CFilter(dialStr2,   16,     0,     32,    0,     16,  4096,  32),
+  //      name               thresh  origin ormrgn   min   mnmrgn max   mxmrgn
+  CFilter(AnalogFilterStr0,   16,     0,      32,     0,     16,  4096,  32),
+  CFilter(AnalogFilterStr1,   16,     530,    32,     0,     16,  4096,  64),
+  CFilter(AnalogFilterStr2,   16,     0,      32,     0,     16,  4096,  32),
+  CFilter(AnalogFilterStr3,   16,     530,    32,     0,     16,  4096,  64),
+  CFilter(AnalogFilterStr4,   16,     0,      32,     0,     16,  4096,  32),
+  CFilter(AnalogFilterStr5,   16,     2048,   128,    0,     16,  4096,  32),
+  CFilter(AnalogFilterStr6,   16,     2048,   128,    0,     16,  4096,  32),
+  CFilter(AnalogFilterStr7,   16,     2048,   128,    0,     16,  4096,  32),
 };
 
 // Logical switch scanner.
@@ -84,8 +73,8 @@ const PROGMEM CSwitch footSwitches[] =
   CSwitch(footSwitchesStr0),
   CSwitch(footSwitchesStr1),
 };
-const PROGMEM char modeSwitchStr[] = "Mode";
-const PROGMEM CSwitch modeSwitch(modeSwitchStr);
+//const PROGMEM char modeSwitchStr[] = "Mode";
+//const PROGMEM CSwitch modeSwitch(modeSwitchStr);
 const PROGMEM char switchLedMatrixStr0[] = "Trans";
 const PROGMEM char switchLedMatrixStr1[] = "Clav";
 const PROGMEM char switchLedMatrixStr2[] = "P1";
@@ -211,19 +200,28 @@ const PROGMEM CMidiKeySwitch keyboard[] =
   CMidiKeySwitch(NoteC5Str),
 };
 
-//MIDI_CREATE_DEFAULT_INSTANCE();
+// The MIDI jacks (In and Out) on back of the keyboard.
+CMidiPort<HardwareSerial> midiJacks((HardwareSerial&)Serial);
 
+enum EUseCase
+{
+  E_UC_SIMPLE_CC = 0,
+  E_UC_SHIFT = 1,
+  E_UC_SHIFTED_CC = 2,
+
+  E_UC_NUM_USECASES
+};
 
 // Regular scanning of input switches.
 void scan_switches(void)
 {
   // From CAT9555 ports.
-  footSwitches[0].scan(
-    (RegTS.read() & 0x0080) == 0);
-  footSwitches[1].scan(
-    (RegTS.read() & 0x0040) == 0);
-  modeSwitch.scan(
-    (RegTS.read() & 0x0100) != 0);
+  footSwitches[0].scan( //        CC   Use Case
+    (RegTS.read() & 0x0080) == 0, 64,  E_UC_SIMPLE_CC);
+  footSwitches[1].scan( //        CC   Use Case
+    (RegTS.read() & 0x0040) == 0, 66,  E_UC_SIMPLE_CC);
+  //modeSwitch.scan(
+  //  (RegTS.read() & 0x0100) != 0);
 
   // From MCU direct ports.
   joystickButton.scan(
@@ -236,33 +234,37 @@ void scan_switches(void)
     digitalRead(midiCableDetectPin) == HIGH);
 }
 
-void scan_analogs(void)
+void scan_analogs(uint8_t index)
 {
-  joysticks[0].scan(AnalogA.read(6)); // Joystick X
-  joysticks[1].scan(AnalogA.read(7)); // Joystick Y
-  joysticks[2].scan(AnalogA.read(5)); // Joystick Z
-  footCtrls[0].scan(AnalogA.read(3)); // FC1
-  footCtrls[1].scan(AnalogA.read(1)); // FC2
-  dialCtrls[0].scan(AnalogA.read(4)); // Volume
-  dialCtrls[1].scan(AnalogA.read(2)); // Brilliance
-  dialCtrls[2].scan(AnalogA.read(0)); // Tremolo Rate
+  analogFilters[index].scan(AnalogA.read(index));
 }
 
 // Scanning of switches, updating of LEDs in the 4x3 matrix.
 static unsigned switch_led_scan_column_index = 0;
+
+enum EShiftStates
+{
+  E_SS_UNSHIFTED = 0,
+  E_SS_PROGCH = 1,
+  E_SS_TRANS = 2,
+  E_SS_SYS = 3,
+
+  E_SS_NUM_STATES
+};
+enum EShiftStates shiftState = E_SS_UNSHIFTED;
 
 void switch_led_sync_led_states_this_column(void)
 {
   const uint16_t mask = 0xe1ff;
   uint16_t val = (RegTS.read() & mask);
 
-  if (switchLedMatrix[switch_led_scan_column_index].ledState())     // Row 1
+  if (switchLedMatrix[switch_led_scan_column_index].ledState(shiftState))     // Row 1
     val |= 0x1000;
-  if (switchLedMatrix[switch_led_scan_column_index + 3].ledState()) // Row 2
+  if (switchLedMatrix[switch_led_scan_column_index + 3].ledState(shiftState)) // Row 2
     val |= 0x0800;
-  if (switchLedMatrix[switch_led_scan_column_index + 6].ledState()) // Row 3
+  if (switchLedMatrix[switch_led_scan_column_index + 6].ledState(shiftState)) // Row 3
     val |= 0x0400;
-  if (switchLedMatrix[switch_led_scan_column_index + 9].ledState()) // Row 4
+  if (switchLedMatrix[switch_led_scan_column_index + 9].ledState(shiftState)) // Row 4
     val |= 0x0200;
 
   RegTS.write(val); 
@@ -282,21 +284,32 @@ void switch_led_next_column( void )
 
 void switch_led_scan_switches_this_column(void)
 {
+  // LS 7bits are the CC num, MSB is the use case selector between shift and shifted.
+  uint8_t ccMap[] = { 128, 106, 102, 129, 107, 103, 93, 108, 104, 92, 109, 105 };
   // Scan the rows.
   switchLedMatrix[switch_led_scan_column_index].scan(     // Row 1
-    (RegTS.read() & 0x0001) != 0);
+    (RegTS.read() & 0x0001) != 0,
+    ccMap[switch_led_scan_column_index] & 0x7f,
+    (ccMap[switch_led_scan_column_index] & 0x80) != 0?E_UC_SHIFT:E_UC_SHIFTED_CC);
   switchLedMatrix[switch_led_scan_column_index + 3].scan( // Row 2
-    (RegTS.read() & 0x0002) != 0);
+    (RegTS.read() & 0x0002) != 0,
+    ccMap[switch_led_scan_column_index + 3] & 0x7f,
+    (ccMap[switch_led_scan_column_index + 3] & 0x80) != 0?E_UC_SHIFT:E_UC_SHIFTED_CC);
   switchLedMatrix[switch_led_scan_column_index + 6].scan( // Row 3
-    (RegTS.read() & 0x0004) != 0);
+    (RegTS.read() & 0x0004) != 0,
+    ccMap[switch_led_scan_column_index + 6] & 0x7f,
+    (ccMap[switch_led_scan_column_index + 6] & 0x80) != 0?E_UC_SHIFT:E_UC_SHIFTED_CC);
   switchLedMatrix[switch_led_scan_column_index + 9].scan( // Row 4
-    (RegTS.read() & 0x0008) != 0);
+    (RegTS.read() & 0x0008) != 0,
+    ccMap[switch_led_scan_column_index + 9] & 0x7f,
+    (ccMap[switch_led_scan_column_index + 9] & 0x80) != 0?E_UC_SHIFT:E_UC_SHIFTED_CC);
 }
 
 static unsigned kbd_scan_column_index = 0;
 
 void kbd_scan_next_column_sequence( void )
 {
+  // Tried: 'static const PROGMEM' but it didn't work as expected.  Probably need an accessor function later.
   byte pattern[8] = { 0xfe, 0xfd, 0xfb, 0xf7, 0xef, 0xdf, 0xbf, 0x7f };
 
   // Select the column to scan.
@@ -333,7 +346,142 @@ void kbd_scan_keys_this_column(void)
   kbd_scan_column_index = (kbd_scan_column_index + 1) % 8;
 }
 
+// Callbacks / hook functions.
+void setLed(bool val)
+{
+  ledPreviousMillis = millis();
+  ledState = val;
+  digitalWrite(ledPin, ledState);
+}
+
+void noteOn(uint8_t note, uint8_t velocity, uint8_t channel)
+{
+  midiJacks.noteOn(note, velocity, channel);
+}
+
+void noteOff(uint8_t note, uint8_t velocity, uint8_t channel)
+{
+  midiJacks.noteOff(note, velocity, channel);
+}
+
+//                        Trans PC 1  2  3   4  5  6  7   8  Ch Trem
+uint8_t switchLedSeq[12] = { 0, 3, 2, 5, 8, 11, 1, 4, 7, 10, 6, 9 };
+uint8_t currentPC = 0;
+
+void syncLedsToProgChange(void)
+{
+    for (unsigned i = 2; i < 10; i++) {
+      switchLedMatrix[switchLedSeq[i]].setLedState(i == (currentPC + 2), E_SS_PROGCH);
+    }
+}
+
+void switchChanged(bool state, uint8_t ccNum, uint8_t uCase)
+{
+  uint8_t channel = CMidiKeySwitch::getMidiCh();
+  uint8_t ccVal = state?127:0;
+  uint8_t newPC = currentPC;
+  if (ccNum > 119)
+    // Note: Default value passed into an incompletely defined CSwitch scan() is 255.
+    return;
+  switch (uCase)
+  {
+    case E_UC_SIMPLE_CC: // Simple switch mapped to CC use case
+      midiJacks.ctrlCh(ccNum, ccVal, channel);
+      break;
+    case E_UC_SHIFT:
+      if (state) break; // Only process the switch release.
+      switch (shiftState)
+      {
+        case E_SS_UNSHIFTED:
+          if (ccNum) {
+            // Prog Change switch pressed
+            shiftState = E_SS_PROGCH;
+            syncLedsToProgChange();
+          } else {
+            // Transpose switch pressed
+            shiftState = E_SS_TRANS;
+          }
+          break;
+        case E_SS_PROGCH:
+          // Prog Change or Transpose switch pressed - cancel / exit
+          shiftState = E_SS_UNSHIFTED;
+          break;
+        case E_SS_TRANS:
+          if (ccNum) {
+            // Prog Change switch pressed - go to system mode
+            shiftState = E_SS_SYS;
+          } else {
+            // Transpose switch pressed - cancel / exit
+            shiftState = E_SS_UNSHIFTED;
+          }
+          break;
+        case E_SS_SYS:
+          if (ccNum) {
+            // Prog Change switch pressed - step through system mode functions
+            // TODO - stuff
+          } else {
+            // Transpose switch pressed - cancel / exit
+            shiftState = E_SS_UNSHIFTED;
+          }
+          break;
+        default:
+          shiftState = E_SS_UNSHIFTED;
+          break;
+      }
+      break;
+    case E_UC_SHIFTED_CC:
+      switch (shiftState)
+      {
+        case E_SS_UNSHIFTED:
+          // Unshifted, so this switch sends out a CC
+          midiJacks.ctrlCh(ccNum, ccVal, channel);
+          break;
+        case E_SS_PROGCH:
+#if 0
+// Not sure I like having the quick PC 1-8 exit the mode.
+          if (!state) {
+            // Affect state change at the switch release
+            if (ccNum >= 102) {
+              // Exit the shifted state
+              shiftState = E_SS_UNSHIFTED;
+            }
+            // Otherwise stay in present state because user could inc / dec multiple times.
+            break;
+          }
+#endif
+          // Shifted as Prog Change, so this switch sends out a prog change.
+          if (ccNum >= 102) {
+            // One of the eight short cut PC for PC1-PC8 (0-7).
+            newPC = ccNum - 102;
+          } else if (ccNum == 93) {
+            // Chorus - Decrement PC by one
+            if (newPC > 0)
+              newPC--;
+          } else if (ccNum == 92) {
+            // Tremelo - Increment PC by one
+            if (newPC < 127)
+              newPC++;
+          }
+          if (newPC != currentPC) {
+            // Only send out a PC message if the value has changed.
+            currentPC = newPC;
+            midiJacks.progCh(currentPC, channel);
+          }
+          syncLedsToProgChange();
+          break;
+        // Rest of these are TBD.
+        default:
+          break;
+      }
+      break;
+    default:
+      break;
+  }
+}
+
+
 // The setup() function runs once at startup.
+unsigned long lastCycleTimestamp = 0;
 void setup()
 {
   // Initialize LED for flashing.
@@ -355,52 +503,80 @@ void setup()
   Wire.begin();
   Wire.setClock(wireClockFrequency);
 
-  // Initialize serial UART for debug output.
-  Serial.begin(9600);
-  Serial.println(F("Chi - stage 1 version 1"));
-
   // Probe and initialize the CAT9555 expansion ports.
   RegRQ.begin();
   RegTS.begin();
 
   // Probe and initialize the AD7997 analog ports.
   AnalogA.begin();
+
+  // Read in so we can check the mode switch at startup.
+  RegTS.syncIn();
+  debug_mode = ((RegTS.read() & 0x0100) != 0);
+
+  if (!debug_mode) {
+    // Use serial for MIDI
+    midiJacks.begin(&setLed);
+    //Serial.begin(31250);
+  } else {
+    // Initialize serial UART for debug output.
+    Serial.begin(230400);
+    Serial.println(F("Chi - stage 1 version 1"));
+  }
+
+  // Set up the shift state overlays to indicate the modes
+  // E_SS_UNSHIFTED - both off
+  switchLedMatrix[switchLedSeq[0]].setLedState(false, E_SS_UNSHIFTED); // Transpose LED
+  switchLedMatrix[switchLedSeq[1]].setLedState(false, E_SS_UNSHIFTED); // Prog Change LED
+  // E_SS_PROGCH - prog change on, transpose off
+  switchLedMatrix[switchLedSeq[0]].setLedState(false, E_SS_PROGCH); // Transpose LED
+  switchLedMatrix[switchLedSeq[1]].setLedState(true, E_SS_PROGCH); // Prog Change LED
+  // E_SS_TRANS - transpose on, prog change off
+  switchLedMatrix[switchLedSeq[0]].setLedState(true, E_SS_TRANS); // Transpose LED
+  switchLedMatrix[switchLedSeq[1]].setLedState(false, E_SS_TRANS); // Prog Change LED
+  // E_SS_SYS - both on
+  switchLedMatrix[switchLedSeq[0]].setLedState(true, E_SS_SYS); // Transpose LED
+  switchLedMatrix[switchLedSeq[1]].setLedState(true, E_SS_SYS); // Prog Change LED
+
+  lastCycleTimestamp = micros();
 }
 
 // The loop() function runs over and over again.
-uint8_t switchLedSeq[12] = { 0, 3, 2, 5, 8, 11, 1, 4, 7, 10, 6, 9 };
+
+#define CYCLE_WIN_SZ 8
+unsigned long cycleTimes[CYCLE_WIN_SZ] = { 0 };
+unsigned long cycleTime = 0;
+int cycleInd = 0;
+
 void loop()
 {
   unsigned long currentMillis = millis();
   static unsigned led = 0;
-
+  unsigned long thisCycleTimestamp = micros();
   if (currentMillis - ledPreviousMillis >= ledBlinkInterval) {
     // save the last time you blinked the LED
     ledPreviousMillis = currentMillis;
 
-    // Toggle LED state
-    if (ledState == LOW) {
-      ledState = HIGH;
+    if (debug_mode) {
+      // In debug mode, the LED flashes, toggling every ledBlickInterval.
+      // Toggle LED state
+      if (ledState == LOW) {
+        ledState = HIGH;
+      } else {
+        ledState = LOW;
+      }
     } else {
-      ledState = LOW;
+      // Active sense
+      midiJacks.activeSense();
+      //char buf[] = { 0xFE };
+      //Serial.write(buf, sizeof(buf));
     }
 
     // Flush output state to LED
     digitalWrite(ledPin, ledState);
 
-#if 0
-    Serial.print(F("Analogs: ["));
-    for (uint8_t i = 0; i < CAd7997::E_NUM_PORTS; i++) {
-      Serial.print(F(" #"));
-      Serial.print(i);
-      Serial.print(F(":"));
-      Serial.print(AnalogA.read(i));
-    }
-    Serial.println(F(" ]"));
-#endif
-
-    for (unsigned i = 0; i < 12; i++) {
-      switchLedMatrix[switchLedSeq[i]].setLedState(i == led);
+    for (unsigned i = 2; i < 12; i++) {
+      switchLedMatrix[switchLedSeq[i]].setLedState(i == led, E_SS_UNSHIFTED);
     }
     led++;
     led %= 12;
@@ -420,11 +596,20 @@ void loop()
 
   kbd_scan_keys_this_column();
   switch_led_scan_switches_this_column();
-
   scan_switches();
 
   // Read in from the AD7997 analog ports.
-  AnalogA.sync();
-  scan_analogs();
+  AnalogA.sync(kbd_scan_column_index);
+  scan_analogs(kbd_scan_column_index);
+
+  cycleTime -= cycleTimes[cycleInd];
+  cycleTimes[cycleInd] = micros() - lastCycleTimestamp;
+  cycleTime += cycleTimes[cycleInd];
+  
+  if (cycleInd < (CYCLE_WIN_SZ - 1))
+    cycleInd++;
+  else
+    cycleInd = 0;
+  lastCycleTimestamp = thisCycleTimestamp;
 }
 

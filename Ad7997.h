@@ -37,6 +37,7 @@ class CAd7997
     ~CAd7997(void);
     void begin(void);
     void sync(void);
+    void sync(uint8_t index);
     uint16_t read(uint8_t index) { return m_inValue[index]; }
 
   public:
@@ -47,3 +48,4 @@ class CAd7997
 };
 
 #endif
+

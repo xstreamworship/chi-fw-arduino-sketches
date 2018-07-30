@@ -8,7 +8,11 @@
 // See the LICENSE file for license terms.
 /////////////////////////////////////////////////////////////////////
 #include "Arduino.h"
+
 #include "Switch.h"
+
+extern bool debug_mode;
+void switchChanged(bool state, uint8_t ccNum, uint8_t uCase);
 
 CSwitch::CSwitch(const PROGMEM char *switchName) :
   m_switchName(switchName),
@@ -22,7 +26,7 @@ CSwitch::~CSwitch(void)
 {
 }
 
-void CSwitch::scan(bool state)
+void CSwitch::scan(bool state, uint8_t ccNum, uint8_t uCase)
 {
   if (state)
   {
@@ -45,7 +49,7 @@ void CSwitch::scan(bool state)
       case E_SW_VALIDATING_ON:
         // Complete the off
         if ((micros() - m_timeStart) >= E_TIMEDEBOUNCE) {
-          switchOn();
+          switchOn(ccNum, uCase);
           m_state = E_SW_ON;
         }
         break;
@@ -72,7 +76,7 @@ void CSwitch::scan(bool state)
       case E_SW_VALIDATING_OFF:
         // Complete the off
         if ((micros() - m_timeStart) >= E_TIMEDEBOUNCE) {
-          switchOff();
+          switchOff(ccNum, uCase);
           m_state = E_SW_OFF;
         }
         break;
@@ -80,21 +84,31 @@ void CSwitch::scan(bool state)
   }
 }
 
-void CSwitch::switchOn(void)
+void CSwitch::switchOn(uint8_t ccNum, uint8_t uCase)
 {
-  char mbuffer[12];
-  Serial.print(F("Switch: "));
-  strncpy_P(mbuffer, m_switchName, sizeof(mbuffer) - 1);
-  Serial.print(mbuffer);
-  Serial.println(F(" on"));
+  if (!debug_mode) {
+    // Using serial for MIDI.
+    switchChanged(true, ccNum, uCase);
+  } else {
+    char mbuffer[12];
+    Serial.print(F("Switch: "));
+    strncpy_P(mbuffer, m_switchName, sizeof(mbuffer) - 1);
+    Serial.print(mbuffer);
+    Serial.println(F(" on"));
+  }
 }
 
-void CSwitch::switchOff(void)
+void CSwitch::switchOff(uint8_t ccNum, uint8_t uCase)
 {
-  char mbuffer[12];
-  Serial.print(F("Switch: "));
-  strncpy_P(mbuffer, m_switchName, sizeof(mbuffer) - 1);
-  Serial.print(mbuffer);
-  Serial.println(F(" off"));
+  if (!debug_mode) {
+    // Using serial for MIDI.
+    switchChanged(false, ccNum, uCase);
+  } else {
+    char mbuffer[12];
+    Serial.print(F("Switch: "));
+    strncpy_P(mbuffer, m_switchName, sizeof(mbuffer) - 1);
+    Serial.print(mbuffer);
+    Serial.println(F(" off"));
+  }
 }
 

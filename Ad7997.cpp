@@ -37,37 +37,42 @@ void CAd7997::begin(void)
 
 void CAd7997::sync(void)
 {
-  uint8_t invl;
   for (uint8_t i = 0; i < E_NUM_PORTS; i++)
   {
-    // Initiate read command
-    Wire.beginTransmission(m_i2cAddr);
-    Wire.write(E_READ_CMD + (i << 4));
-    Wire.endTransmission();
-    // Do the read
-    Wire.requestFrom(m_i2cAddr, (byte) 2);
-    if (Wire.available())
-    {
-      invl = Wire.read();
-      if (((invl >> 4) & 0x07) != i) {
-        m_errCnt++;
-        continue;
-      }
-      set_msb(m_inValue[i], (invl & 0x0f));
-    }
-    else
-    {
+    sync(i);
+  }
+}
+
+void CAd7997::sync(uint8_t i)
+{
+  uint8_t invl;
+  // Initiate read command
+  Wire.beginTransmission(m_i2cAddr);
+  Wire.write(E_READ_CMD + (i << 4));
+  Wire.endTransmission();
+  // Do the read
+  Wire.requestFrom(m_i2cAddr, (byte) 2);
+  if (Wire.available())
+  {
+    invl = Wire.read();
+    if (((invl >> 4) & 0x07) != i) {
       m_errCnt++;
+      return;
     }
-    if (Wire.available())
-    {
-      invl = Wire.read();
-      set_lsb(m_inValue[i], invl);
-    }
-    else
-    {
-      m_errCnt++;
-    }
+    set_msb(m_inValue[i], (invl & 0x0f));
+  }
+  else
+  {
+    m_errCnt++;
+  }
+  if (Wire.available())
+  {
+    invl = Wire.read();
+    set_lsb(m_inValue[i], invl);
+  }
+  else
+  {
+    m_errCnt++;
   }
 }
 
