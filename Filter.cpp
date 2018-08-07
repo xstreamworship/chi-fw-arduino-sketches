@@ -12,10 +12,12 @@
 #include "Filter.h"
 
 extern bool debug_mode;
+void analogChanged(bool state, uint16_t val, uint8_t ccNum, uint8_t uCase);
 
 CFilter::CFilter(const PROGMEM char *filterName, const PROGMEM uint16_t thresh,
       const PROGMEM uint16_t origin, const PROGMEM uint16_t originMargin, const PROGMEM uint16_t minv,
-      const PROGMEM uint16_t minMargin, const PROGMEM uint16_t maxv, const PROGMEM uint16_t maxMargin) :
+      const PROGMEM uint16_t minMargin, const PROGMEM uint16_t maxv, const PROGMEM uint16_t maxMargin,
+      const uint8_t ccNum, const uint8_t useCase) :
   m_filterName(filterName),
   m_threshold(thresh),
   m_origin(origin),
@@ -27,7 +29,9 @@ CFilter::CFilter(const PROGMEM char *filterName, const PROGMEM uint16_t thresh,
   m_state(E_FILT_REST),
   m_region(E_FILT_AT_ORIGIN),
   m_timeStart(0),
-  m_lastValue(0)
+  m_lastValue(0),
+  m_ccNum(ccNum),
+  m_useCase(useCase)
 {
 }
 
@@ -56,8 +60,8 @@ void CFilter::scan(int sample)
     else if ((m_region == E_FILT_IN_LOWER_REGION) || (m_region == E_FILT_IN_UPPER_REGION))
     {
       // We are validated as in an active region, so check for movement.
-      if ((abs(sample - ((int)m_lastValue)) >= ((int)m_threshold)) ||
-         ((sample != ((int)m_lastValue)) && ((micros() - m_timeStart) >= E_TIMEDEBOUNCE)))
+      if ((abs(sample - ((int)m_lastValue)) >= ((int)m_threshold)) )// ||
+         //((sample != ((int)m_lastValue)) && ((micros() - m_timeStart) >= E_TIMEDEBOUNCE)))
       {
         // Either we changed beyond a threshold, or we have changed since the last time interval.
         m_lastValue = ((uint16_t)sample);
@@ -80,7 +84,7 @@ void CFilter::scan(int sample)
         changed();
         m_timeStart = micros();
       }
-      // Cancel the validation to filter (ignorte) the glitch.
+      // Cancel the validation to filter (ignore) the glitch.
       m_state = E_FILT_REST;
     }
   }
@@ -98,6 +102,28 @@ void CFilter::changed(void)
 {
   if (!debug_mode) {
     // Using serial for MIDI.
+    bool state = false;
+    uint16_t val = 0;
+    switch (m_region)
+    {
+      case E_FILT_AT_ORIGIN:
+        break;
+      case E_FILT_AT_MIN:
+        val = m_origin - m_originMargin - m_min - m_minMargin;
+        break;
+      case E_FILT_IN_LOWER_REGION:
+        val = m_origin - m_originMargin - m_lastValue;
+        break;
+      case E_FILT_AT_MAX:
+        val = m_max - m_maxMargin - m_origin - m_originMargin;
+        state = true;
+        break;
+      case E_FILT_IN_UPPER_REGION:
+        state = true;
+        val = m_lastValue - m_origin - m_originMargin;
+        break;
+    }
+    analogChanged(state, val, m_ccNum, m_useCase);
   } else {
     char mbuffer[12];
     Serial.print(F("Filter: "));
@@ -113,14 +139,15 @@ void CFilter::changed(void)
         break;
       case E_FILT_IN_LOWER_REGION:
         Serial.print(F(" lower: "));
-        Serial.println(m_lastValue);
+        Serial.println(m_origin - m_originMargin - m_lastValue);
         break;
       case E_FILT_AT_MAX:
+        //Serial.println(m_max - m_maxMargin - m_origin - m_originMargin);
         Serial.println(F(" max"));
         break;
       case E_FILT_IN_UPPER_REGION:
         Serial.print(F(" upper: "));
-        Serial.println(m_lastValue);
+        Serial.println(m_lastValue - m_origin - m_originMargin);
         break;
     }
   }

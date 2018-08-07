@@ -17,6 +17,7 @@ void switchChanged(bool state, uint8_t ccNum, uint8_t uCase);
 CSwitch::CSwitch(const PROGMEM char *switchName) :
   m_switchName(switchName),
   m_state(E_SW_OFF),
+  m_stateStatus(false),
   m_timeStart(0),
   m_ledState(false)
 {
@@ -51,6 +52,7 @@ void CSwitch::scan(bool state, uint8_t ccNum, uint8_t uCase)
         if ((micros() - m_timeStart) >= E_TIMEDEBOUNCE) {
           switchOn(ccNum, uCase);
           m_state = E_SW_ON;
+          m_stateStatus = true;
         }
         break;
     }
@@ -78,6 +80,7 @@ void CSwitch::scan(bool state, uint8_t ccNum, uint8_t uCase)
         if ((micros() - m_timeStart) >= E_TIMEDEBOUNCE) {
           switchOff(ccNum, uCase);
           m_state = E_SW_OFF;
+          m_stateStatus = false;
         }
         break;
     }

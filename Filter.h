@@ -44,13 +44,17 @@ class CFilter
     enum region m_region;
     uint16_t m_lastValue;
     unsigned long m_timeStart;
+    const uint8_t m_ccNum;
+    const uint8_t m_useCase;
 
   public:
     CFilter(const PROGMEM char *filterName, const PROGMEM uint16_t thresh,
       const PROGMEM uint16_t origin, const PROGMEM uint16_t originMargin, const PROGMEM uint16_t minv,
-      const PROGMEM uint16_t minMargin, const PROGMEM uint16_t maxv, const PROGMEM uint16_t maxMargin);
+      const PROGMEM uint16_t minMargin, const PROGMEM uint16_t maxv, const PROGMEM uint16_t maxMargin,
+      const uint8_t ccNum = 255, const uint8_t useCase = 0);
     ~CFilter(void);
     void scan(int sample);
+    bool atOrigin(void) { return (m_region == E_FILT_AT_ORIGIN) && (m_state == E_FILT_REST); }
     enum region inRegion(int sample)
     {
       if (abs(sample - ((int)m_origin)) < ((int)m_originMargin))

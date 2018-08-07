@@ -44,6 +44,15 @@ CCat9555 RegRQ(32, REG_RQ_PORT_CONFIG); // I2C address and port config
 CCat9555 RegTS(33, REG_TS_PORT_CONFIG); // I2C address and port config
 
 // Analog filters
+enum EAUseCase
+{
+  E_AUC_SIMPLE_CC = 0,
+  E_AUC_SCALED_19_16_CC = 1,
+  E_AUC_JOYSTICK = 2,
+
+  E_AUC_NUM_USECASES
+};
+
 const PROGMEM char AnalogFilterStr0[] = "Trem Rate";
 const PROGMEM char AnalogFilterStr1[] = "FC2";
 const PROGMEM char AnalogFilterStr2[] = "Brilliance";
@@ -54,15 +63,15 @@ const PROGMEM char AnalogFilterStr6[] = "JoyX";
 const PROGMEM char AnalogFilterStr7[] = "JoyY";
 const PROGMEM CFilter analogFilters[] =
 {
-  //      name               thresh  origin ormrgn   min   mnmrgn max   mxmrgn
-  CFilter(AnalogFilterStr0,   16,     0,      32,     0,     16,  4096,  32),
-  CFilter(AnalogFilterStr1,   16,     530,    32,     0,     16,  4096,  64),
-  CFilter(AnalogFilterStr2,   16,     0,      32,     0,     16,  4096,  32),
-  CFilter(AnalogFilterStr3,   16,     530,    32,     0,     16,  4096,  64),
-  CFilter(AnalogFilterStr4,   16,     0,      32,     0,     16,  4096,  32),
-  CFilter(AnalogFilterStr5,   16,     2048,   128,    0,     16,  4096,  32),
-  CFilter(AnalogFilterStr6,   16,     2048,   128,    0,     16,  4096,  32),
-  CFilter(AnalogFilterStr7,   16,     2048,   128,    0,     16,  4096,  32),
+  //      name               thresh  origin ormrgn   min   mnmrgn max   mxmrgn  CC   use case
+  CFilter(AnalogFilterStr0,   32,     0,      0,      0,     0,   4095,  0,     90,  E_AUC_SIMPLE_CC),
+  CFilter(AnalogFilterStr1,   32,     0,      594,    0,     0,   4095,  61,    4,   E_AUC_SCALED_19_16_CC),
+  CFilter(AnalogFilterStr2,   32,     0,      0,      0,     0,   4095,  0,     70,  E_AUC_SIMPLE_CC),
+  CFilter(AnalogFilterStr3,   32,     0,      594,    0,     0,   4095,  61,    11,  E_AUC_SCALED_19_16_CC),
+  CFilter(AnalogFilterStr4,   32,     0,      0,      0,     0,   4095,  0,     7,   E_AUC_SIMPLE_CC),
+  CFilter(AnalogFilterStr5,   16,     2016,   130,    0,     70,  4095,  133,   2,   E_AUC_JOYSTICK),
+  CFilter(AnalogFilterStr6,   8,      2010,   100,    0,     94,  4095,  169,   0,   E_AUC_JOYSTICK),
+  CFilter(AnalogFilterStr7,   8,      2044,   100,    0,     18,  4095,  25,    1,   E_AUC_JOYSTICK),
 };
 
 // Logical switch scanner.
@@ -208,6 +217,7 @@ enum EUseCase
   E_UC_SIMPLE_CC = 0,
   E_UC_SHIFT = 1,
   E_UC_SHIFTED_CC = 2,
+  E_UC_ROTARY_CC = 3,
 
   E_UC_NUM_USECASES
 };
@@ -226,10 +236,10 @@ void scan_switches(void)
   // From MCU direct ports.
   joystickButton.scan(
     digitalRead(joystickButtonPin) == LOW);
-  rotarySw[0].scan(
-    digitalRead(rotarySwPin[0]) == LOW);
+  rotarySw[0].scan( //                Lf/Rt  Use Case
+    digitalRead(rotarySwPin[0]) == LOW, 0,   E_UC_ROTARY_CC);
   rotarySw[1].scan(
-    digitalRead(rotarySwPin[1]) == LOW);
+    digitalRead(rotarySwPin[1]) == LOW, 1,   E_UC_ROTARY_CC);
   midiCableDetect.scan(
     digitalRead(midiCableDetectPin) == HIGH);
 }
@@ -375,6 +385,18 @@ void syncLedsToProgChange(void)
     }
 }
 
+enum ERotaryStates
+{
+  E_RS_BRAKED = 0,
+  E_RS_SLOW = 1,
+  E_RS_FAST = 2,
+  E_RS_BRAKE_PENDING = 3,
+
+  E_RS_NUM_STATES
+};
+enum ERotaryStates rotaryState = E_RS_BRAKED;
+unsigned long rotaryBrakeStart = 0;
+
 void switchChanged(bool state, uint8_t ccNum, uint8_t uCase)
 {
   uint8_t channel = CMidiKeySwitch::getMidiCh();
@@ -448,6 +470,8 @@ void switchChanged(bool state, uint8_t ccNum, uint8_t uCase)
             // Otherwise stay in present state because user could inc / dec multiple times.
             break;
           }
+#else
+          if (!state) break; // Only process the switch press.
 #endif
           // Shifted as Prog Change, so this switch sends out a prog change.
           if (ccNum >= 102) {
@@ -474,11 +498,253 @@ void switchChanged(bool state, uint8_t ccNum, uint8_t uCase)
           break;
       }
       break;
+    case E_UC_ROTARY_CC:
+      switch(rotaryState)
+      {
+        case E_RS_BRAKED:
+          if (state) {
+            if (ccNum == 0) {
+              // switched to slow
+              midiJacks.ctrlCh(80, 0, channel);
+              midiJacks.ctrlCh(81, 0, channel);
+              rotaryState = E_RS_SLOW;
+            } else if (ccNum == 1) {
+              // switched to fast
+              midiJacks.ctrlCh(80, 127, channel);
+              midiJacks.ctrlCh(81, 0, channel);
+              midiJacks.ctrlCh(82, 127, channel);
+              rotaryState = E_RS_FAST;
+            }
+          }
+          break;
+        case E_RS_SLOW:
+          if ((ccNum == 0) && !state) {
+            // switched to centre
+            midiJacks.ctrlCh(80, 64, channel);
+            rotaryState = E_RS_BRAKE_PENDING;
+            // Start timer
+            rotaryBrakeStart = micros();
+          } else if ((ccNum == 1) && state) {
+            // rapidly switched to fast
+            midiJacks.ctrlCh(80, 127, channel);
+            midiJacks.ctrlCh(82, 127, channel);
+            rotaryState = E_RS_FAST;
+          }
+          break;
+        case E_RS_FAST:
+          if ((ccNum == 0) && state) {
+            // rapidly switched to slow
+            midiJacks.ctrlCh(80, 0, channel);
+            midiJacks.ctrlCh(82, 0, channel);
+            rotaryState = E_RS_SLOW;
+          } else if ((ccNum == 1) && !state) {
+            // switched to centre
+            midiJacks.ctrlCh(80, 64, channel);
+            midiJacks.ctrlCh(82, 0, channel);
+            rotaryState = E_RS_BRAKE_PENDING;
+            // Start timer
+            rotaryBrakeStart = micros();
+          }
+          break;
+        case E_RS_BRAKE_PENDING:
+          if (ccNum = 2) {
+            // Timeout
+            midiJacks.ctrlCh(81, 127, channel);
+            rotaryState = E_RS_BRAKED;
+          } else if (state) {
+            if (ccNum == 0) {
+              // switched to slow
+              midiJacks.ctrlCh(80, 0, channel);
+              rotaryState = E_RS_SLOW;
+              // Stop timer
+              rotaryBrakeStart = 0;
+            } else if (ccNum == 1) {
+              // switched to fast
+              midiJacks.ctrlCh(80, 127, channel);
+              midiJacks.ctrlCh(82, 127, channel);
+              rotaryState = E_RS_FAST;
+              // Stop timer
+              rotaryBrakeStart = 0;
+            }
+          }
+          break;
+        default:
+          break;
+      }
+      break;
     default:
       break;
   }
 }
 
+
+bool joystickShifted = false;
+void analogChanged(bool state, uint16_t val, uint8_t ccNum, uint8_t uCase)
+{
+  uint8_t channel = CMidiKeySwitch::getMidiCh();
+  unsigned int ccVal = 127;
+  switch (uCase)
+  {
+    case E_AUC_SIMPLE_CC:
+      if (((val & 0xfe0) >> 5) < 127)
+        ccVal = (val & 0xfe0) >> 5;
+      midiJacks.ctrlCh(ccNum, ccVal, channel);
+      break;
+    case E_AUC_SCALED_19_16_CC:
+      if (((((val + (val >> 3) + (val >> 4))) & 0xfe0) >> 5) < 127)
+        ccVal = (((val + (val >> 3) + (val >> 4))) & 0xfe0) >> 5;
+      midiJacks.ctrlCh(ccNum, ccVal, channel);
+      break;
+    case E_AUC_JOYSTICK:
+      switch (ccNum)
+      {
+        case 0:
+          // X axis (forward / backwards motion)
+          if (((((val + (val >> 3))) & 0xfe0) >> 4) < 127)
+            ccVal = (((val + (val >> 3))) & 0xfe0) >> 4;
+          if (joystickShifted) {
+            uint8_t shftVal = 64;
+            if (ccVal) {
+              if (state) {
+                if (ccVal < 128)
+                  shftVal = 64 + (ccVal >> 1);
+                else
+                  shftVal = 127;
+              } else {
+                if (ccVal <= 128)
+                  shftVal = 64 - (ccVal >> 1);
+                else
+                  shftVal = 0;
+              }
+            }
+            midiJacks.ctrlCh(75, shftVal, channel);
+          } else {
+            if (ccVal == 0) {
+              // At centre position so zero both CC's.
+              midiJacks.ctrlCh(1, 0, channel);
+              midiJacks.ctrlCh(2, 0, channel);
+            } else if (state) {
+              // Forward motion - modulation
+              midiJacks.ctrlCh(1, ccVal, channel);
+            } else {
+              // Reverse motion - breath
+              midiJacks.ctrlCh(2, ccVal, channel);
+            }
+          }
+          break;
+        case 1:
+          // Y axis (left / right motion)
+          if (((val + (val >> 4))) < 2048)
+            ccVal = ((val + (val >> 4)));
+          else
+            ccVal = 2048;
+          if (joystickShifted) {
+            // have to shift ccVal down from 0-2047 range
+            uint8_t shftVal = 64;
+            if (ccVal) {
+              if (state) {
+                if (ccVal < 2048)
+                  shftVal = 64 + (ccVal >> 5);
+                else
+                  shftVal = 127;
+              } else {
+                if (ccVal <= 2048)
+                  shftVal = 64 - (ccVal >> 5);
+                else
+                  shftVal = 0;
+              }
+            }
+            midiJacks.ctrlCh(76, shftVal, channel);
+          } else {
+            // Pitch bend
+            uint16_t pbVal = 8192;
+            if (ccVal) {
+              if (state) {
+                // Right (pitch up) motion
+                if (ccVal < 2048)
+                  pbVal = 8192 + (ccVal << 2);
+                else
+                  pbVal = 16383;
+              } else {
+                // Left (pitch down) motion
+                if (ccVal <= 2048)
+                  pbVal = 8192 - (ccVal << 2);
+                else
+                  pbVal = 0;
+              }
+            }
+            midiJacks.pitchBend(pbVal, channel);
+          }
+          break;
+        case 2:
+          // Z axis (twist CW / CCW motion)
+          if (((((val + (val >> 3))) & 0xfe0) >> 4) < 127)
+            ccVal = (((val + (val >> 3))) & 0xfe0) >> 4;
+          if (joystickShifted) {
+            uint8_t shftVal = 64;
+            if (ccVal) {
+              if (state) {
+                if (ccVal < 128)
+                  shftVal = 64 + (ccVal >> 1);
+                else
+                  shftVal = 127;
+              } else {
+                if (ccVal <= 128)
+                  shftVal = 64 - (ccVal >> 1);
+                else
+                  shftVal = 0;
+              }
+            }
+            midiJacks.ctrlCh(77, shftVal, channel);
+          } else {
+            if (ccVal == 0) {
+              // At centre position so zero both CC's.
+              midiJacks.ctrlCh(12, 0, channel);
+              midiJacks.ctrlCh(13, 0, channel);
+            } else if (state) {
+              // CW motion
+              midiJacks.ctrlCh(12, ccVal, channel);
+            } else {
+              // CCW motion
+              midiJacks.ctrlCh(13, ccVal, channel);
+            }
+          }
+          break;
+        default:
+          break;
+      }
+      break;
+    default:
+      break;
+  }
+}
+
+// Received control change messages only sync up LEDs - useful for Mainstage templates.
+void handleCtrlCh(uint8_t ccNum, uint8_t ccVal, uint8_t channel)
+{
+  if (ccNum == 93) {
+    // Chorus
+    switchLedMatrix[switchLedSeq[10]].setLedState(ccVal >= 64, E_SS_UNSHIFTED);
+  } else if (ccNum == 92) {
+    // Tremolo
+    switchLedMatrix[switchLedSeq[11]].setLedState(ccVal >= 64, E_SS_UNSHIFTED);
+  } else if ((ccNum >= 102) && (ccNum <= 109)) {
+    // Parts 1 to 8
+    switchLedMatrix[switchLedSeq[ccNum - 102 + 2]].setLedState(ccVal >= 64, E_SS_UNSHIFTED);
+  } else if (ccNum == 121) {
+    // Reset all controllers
+    for (unsigned i = 2; i < 12; i++) {
+      switchLedMatrix[switchLedSeq[i]].setLedState(false, E_SS_UNSHIFTED);
+    }
+  }
+}
+
+// Received program change messages only sync up state - useful for Mainstage templates.
+void handleProgCh(uint8_t pcVal, uint8_t channel)
+{
+  currentPC = pcVal;
+  syncLedsToProgChange();
+}
 
 // The setup() function runs once at startup.
 unsigned long lastCycleTimestamp = 0;
@@ -516,7 +782,7 @@ void setup()
 
   if (!debug_mode) {
     // Use serial for MIDI
-    midiJacks.begin(&setLed);
+    midiJacks.begin(&setLed, &handleCtrlCh, &handleProgCh);
     //Serial.begin(31250);
   } else {
     // Initialize serial UART for debug output.
@@ -568,18 +834,18 @@ void loop()
     } else {
       // Active sense
       midiJacks.activeSense();
-      //char buf[] = { 0xFE };
-      //Serial.write(buf, sizeof(buf));
     }
 
     // Flush output state to LED
     digitalWrite(ledPin, ledState);
 
+#if 0
     for (unsigned i = 2; i < 12; i++) {
       switchLedMatrix[switchLedSeq[i]].setLedState(i == led, E_SS_UNSHIFTED);
     }
     led++;
     led %= 12;
+#endif
   }
 
   kbd_scan_next_column_sequence();
@@ -611,5 +877,22 @@ void loop()
   else
     cycleInd = 0;
   lastCycleTimestamp = thisCycleTimestamp;
+
+  if (rotaryBrakeStart) {
+    // Rotary brake mode timer active.
+    if ((micros() - rotaryBrakeStart) > 250000) {
+      // 250ms guard time before braking the rotary since the switch
+      // always passes through the centre position.
+      switchChanged(false, 2, E_UC_ROTARY_CC);
+    }
+  }
+
+  if (analogFilters[5].atOrigin() && analogFilters[6].atOrigin() && analogFilters[7].atOrigin()) {
+    // We only allow the joystick switch to shift / unshift while joystick is positioned at origin.
+    joystickShifted = joystickButton.switchState();
+  }
+
+  // Check for and handle receive MIDI messages.
+  midiJacks.receiveScan();
 }
 
