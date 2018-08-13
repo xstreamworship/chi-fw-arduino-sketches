@@ -7,14 +7,15 @@
 // Available under Mozilla Public License Version 2.0
 // See the LICENSE file for license terms.
 /////////////////////////////////////////////////////////////////////
-#include "Wire.h"
-
+#include "twi_if.h"
 #include "Cat9555.h"
 #include "MidiKeySwitch.h"
 #include "Ad7997.h"
 #include "Switch.h"
 #include "Filter.h"
 #include "MidiPort.h"
+
+#define FORCE_DEBUG 1
 
 // Constants
 long ledBlinkInterval = 300; // ms
@@ -765,9 +766,13 @@ void setup()
   digitalWrite(rotarySwPin[1], HIGH);
   digitalWrite(midiCableDetectPin, HIGH);
 
+#ifdef FORCE_DEBUG
+  Serial.begin(230400);
+  Serial.println(F("Chi - debug"));
+#endif
+
   // Initialize the I2C bus.
-  Wire.begin();
-  Wire.setClock(wireClockFrequency);
+  twi_init(16000000UL, wireClockFrequency);
 
   // Probe and initialize the CAT9555 expansion ports.
   RegRQ.begin();
@@ -777,16 +782,21 @@ void setup()
   AnalogA.begin();
 
   // Read in so we can check the mode switch at startup.
+#ifndef FORCE_DEBUG
   RegTS.syncIn();
   debug_mode = ((RegTS.read() & 0x0100) != 0);
+#else
+  debug_mode = true;
+#endif
 
   if (!debug_mode) {
     // Use serial for MIDI
     midiJacks.begin(&setLed, &handleCtrlCh, &handleProgCh);
-    //Serial.begin(31250);
   } else {
     // Initialize serial UART for debug output.
+#ifndef FORCE_DEBUG
     Serial.begin(230400);
+#endif
     Serial.println(F("Chi - stage 1 version 1"));
   }
 
@@ -839,13 +849,13 @@ void loop()
     // Flush output state to LED
     digitalWrite(ledPin, ledState);
 
-#if 0
-    for (unsigned i = 2; i < 12; i++) {
-      switchLedMatrix[switchLedSeq[i]].setLedState(i == led, E_SS_UNSHIFTED);
+    if (debug_mode) {
+      for (unsigned i = 0; i < 12; i++) {
+        switchLedMatrix[switchLedSeq[i]].setLedState(i == led, E_SS_UNSHIFTED);
+      }
+      led++;
+      led %= 12;
     }
-    led++;
-    led %= 12;
-#endif
   }
 
   kbd_scan_next_column_sequence();

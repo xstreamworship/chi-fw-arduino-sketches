@@ -38,14 +38,14 @@ class CCat9555
     void begin(uint16_t outValue = 0xffff);
     void syncOut(void);
     void syncIn(void);
-    void write(uint16_t outValue) { m_outValue = outValue; }
-    uint16_t read(void) { return (m_inValue & m_portConfig) | (m_outValue & ~ m_portConfig); }
+    inline void write(uint16_t outValue) { m_outValue = outValue; }
+    inline uint16_t read(void) { return (m_inValue & m_portConfig) | (m_outValue & ~ m_portConfig); }
 
   public:
-    static uint8_t lsb_of(uint16_t val) { return val & 0xff; }
-    static uint8_t msb_of(uint16_t val) { return (val >> 8) & 0xff; }
-    static void set_lsb(uint16_t &targ, uint8_t val) { targ = (targ & 0xff00) | (val & 0x00ff); }
-    static void set_msb(uint16_t &targ, uint8_t val) { targ = (targ & 0x00ff) | (val << 8) & 0xff00; }
+    static inline uint8_t lsb_of(uint16_t val) { return val & 0xff; }
+    static inline uint8_t msb_of(uint16_t val) { return (val >> 8) & 0xff; }
+    static inline void set_lsb(uint16_t &targ, uint8_t val) { targ = (targ & 0xff00) | (val & 0x00ff); }
+    static inline void set_msb(uint16_t &targ, uint8_t val) { targ = (targ & 0x00ff) | (val << 8) & 0xff00; }
 };
 
 #endif

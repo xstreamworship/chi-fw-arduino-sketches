@@ -9,7 +9,7 @@
 /////////////////////////////////////////////////////////////////////
 #include "Arduino.h"
 #include "Cat9555.h"
-#include "Wire.h"
+#include "twi_if.h"
 
 CCat9555::CCat9555(const uint8_t i2cAddr, const uint16_t portConfig) :
   m_i2cAddr(i2cAddr),
@@ -30,11 +30,9 @@ void CCat9555::begin(uint16_t outValue)
   m_outValue = outValue;
 
   // Setup the port configuration.
-  Wire.beginTransmission(m_i2cAddr);
-  Wire.write(ECREG_PORT_CONFIG);
-  Wire.write(lsb_of(m_portConfig));
-  Wire.write(msb_of(m_portConfig));
-  Wire.endTransmission();
+  uint8_t data[] = { ECREG_PORT_CONFIG, lsb_of(m_portConfig), msb_of(m_portConfig) };
+  twi_initiate_write(m_i2cAddr, data, sizeof(data));
+  twi_wait_until_master_ready();
 
   // Sync with the hardware
   syncOut();
@@ -43,33 +41,18 @@ void CCat9555::begin(uint16_t outValue)
 
 void CCat9555::syncOut(void)
 {
-  Wire.beginTransmission(m_i2cAddr);
-  Wire.write(ECREG_OUTPUT);
-  Wire.write(lsb_of(m_outValue));
-  Wire.write(msb_of(m_outValue));
-  Wire.endTransmission();
+  uint8_t data[] = { ECREG_OUTPUT, lsb_of(m_outValue), msb_of(m_outValue) };
+  twi_initiate_write(m_i2cAddr, data, sizeof(data));
+  twi_wait_until_master_ready();
 }
 
 void CCat9555::syncIn(void)
 {
-  Wire.beginTransmission(m_i2cAddr);
-  Wire.write(ECREG_INPUT);
-  Wire.endTransmission();
-  Wire.requestFrom(m_i2cAddr, (byte) E_NUM_PORTS);
-  if (Wire.available())
-  {
-    set_lsb(m_inValue, Wire.read());
-  }
-  else
-  {
-    m_errCnt++;
-  }
-  if (Wire.available())
-  {
-    set_msb(m_inValue, Wire.read());
-  }
-  else
-  {
-    m_errCnt++;
-  }
+  uint8_t data_wr[] = { ECREG_INPUT };
+  uint8_t data_rd[2];
+  twi_initiate_transaction(m_i2cAddr, data_wr, sizeof(data_wr), data_rd, sizeof(data_rd));
+  twi_wait_until_master_ready();
+  set_lsb(m_inValue, data_rd[0]);
+  set_msb(m_inValue, data_rd[1]);
 }
+
