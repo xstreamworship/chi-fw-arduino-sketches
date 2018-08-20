@@ -38,7 +38,7 @@ class CSwitch
     CSwitch(const PROGMEM char *switchName);
     ~CSwitch(void);
     bool switchState(void) { return m_stateStatus; }
-    void scan(bool state, uint8_t ccNum = 255, uint8_t uCase = 0);
+    void scan(uint32_t sTime, bool state, uint8_t ccNum = 255, uint8_t uCase = 0);
     inline bool ledState(uint8_t ovLay=0) { return (m_ledState & (1 << (ovLay & 0x07))) != 0; }
     inline void setLedState(bool state, uint8_t ovLay=0) { if (state) ledOn(ovLay); else ledOff(ovLay); }
     inline void ledOn(uint8_t ovLay=0) { m_ledState |= (1 << (ovLay & 0x07)); }

@@ -27,7 +27,7 @@ CSwitch::~CSwitch(void)
 {
 }
 
-void CSwitch::scan(bool state, uint8_t ccNum, uint8_t uCase)
+void CSwitch::scan(uint32_t sTime, bool state, uint8_t ccNum, uint8_t uCase)
 {
   if (state)
   {
@@ -44,12 +44,12 @@ void CSwitch::scan(bool state, uint8_t ccNum, uint8_t uCase)
       case E_SW_OFF:
       default:
         // Transition from off to on.
-        m_timeStart = micros();
+        m_timeStart = sTime;
         m_state = E_SW_VALIDATING_ON;
         // fall through
       case E_SW_VALIDATING_ON:
         // Complete the off
-        if ((micros() - m_timeStart) >= E_TIMEDEBOUNCE) {
+        if ((sTime - m_timeStart) >= E_TIMEDEBOUNCE) {
           switchOn(ccNum, uCase);
           m_state = E_SW_ON;
           m_stateStatus = true;
@@ -72,12 +72,12 @@ void CSwitch::scan(bool state, uint8_t ccNum, uint8_t uCase)
       case E_SW_ON:
       default:
         // Transition from on to off.
-        m_timeStart = micros();
+        m_timeStart = sTime;
         m_state = E_SW_VALIDATING_OFF;
         // fall through
       case E_SW_VALIDATING_OFF:
         // Complete the off
-        if ((micros() - m_timeStart) >= E_TIMEDEBOUNCE) {
+        if ((sTime - m_timeStart) >= E_TIMEDEBOUNCE) {
           switchOff(ccNum, uCase);
           m_state = E_SW_OFF;
           m_stateStatus = false;

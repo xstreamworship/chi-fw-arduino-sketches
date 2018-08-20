@@ -39,7 +39,7 @@ CFilter::~CFilter(void)
 {
 }
 
-void CFilter::scan(int sample)
+void CFilter::scan(int sample, uint32_t sTime)
 {
   enum region where = inRegion(sample);
   if (where == m_region)
@@ -48,12 +48,12 @@ void CFilter::scan(int sample)
     if (m_state == E_FILT_VALIDATING)
     {
       // Still validating entry to this region.
-      if ((micros() - m_timeStart) >= E_TIMEDEBOUNCE)
+      if ((sTime - m_timeStart) >= E_TIMEDEBOUNCE)
       {
         // Complete the validation because time threshold reached.
         m_lastValue = ((uint16_t)sample);
         changed();
-        m_timeStart = micros();
+        m_timeStart = sTime;
         m_state = E_FILT_REST;
       }
     }
@@ -61,12 +61,12 @@ void CFilter::scan(int sample)
     {
       // We are validated as in an active region, so check for movement.
       if ((abs(sample - ((int)m_lastValue)) >= ((int)m_threshold)) )// ||
-         //((sample != ((int)m_lastValue)) && ((micros() - m_timeStart) >= E_TIMEDEBOUNCE)))
+         //((sample != ((int)m_lastValue)) && ((sTime - m_timeStart) >= E_TIMEDEBOUNCE)))
       {
         // Either we changed beyond a threshold, or we have changed since the last time interval.
         m_lastValue = ((uint16_t)sample);
         changed();
-        m_timeStart = micros();
+        m_timeStart = sTime;
       }
     }
   }
@@ -82,7 +82,7 @@ void CFilter::scan(int sample)
         // In an active region for movement so sync up value.
         m_lastValue = ((uint16_t)sample);
         changed();
-        m_timeStart = micros();
+        m_timeStart = sTime;
       }
       // Cancel the validation to filter (ignore) the glitch.
       m_state = E_FILT_REST;
@@ -92,7 +92,7 @@ void CFilter::scan(int sample)
   {
     // A change in region that needs to be validated.
     m_region = where;
-    m_timeStart = micros();
+    m_timeStart = sTime;
     m_state = E_FILT_VALIDATING;
     // Note: Don't change m_S->m_lastValue in case it jumps back.
   }

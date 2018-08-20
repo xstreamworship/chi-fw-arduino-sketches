@@ -18,7 +18,7 @@
 #define FORCE_DEBUG 1
 
 // Constants
-long ledBlinkInterval = 300; // ms
+long ledBlinkInterval = 300000; // us
 const long wireClockFrequency = 800000; // Hz - I2C overclocked to 800kHz
 
 // Arduino I/O pin addresses
@@ -33,7 +33,7 @@ const uint16_t REG_TS_PORT_CONFIG = 0x01ff;
 
 // Variables
 bool ledState = LOW; // used to set the LED
-unsigned long ledPreviousMillis = 0; // will store last time LED was updated
+uint32_t ledPreviousMicros = 0; // will store last time LED was updated
 bool debug_mode;
 
 // Analogue Inputs
@@ -224,30 +224,30 @@ enum EUseCase
 };
 
 // Regular scanning of input switches.
-void scan_switches(void)
+void scan_switches(uint32_t timeTS)
 {
   // From CAT9555 ports.
-  footSwitches[0].scan( //        CC   Use Case
-    (RegTS.read() & 0x0080) == 0, 64,  E_UC_SIMPLE_CC);
-  footSwitches[1].scan( //        CC   Use Case
-    (RegTS.read() & 0x0040) == 0, 66,  E_UC_SIMPLE_CC);
-  //modeSwitch.scan(
+  footSwitches[0].scan( timeTS, // CC   Use Case
+    (RegTS.read() & 0x0080) == 0,  64,  E_UC_SIMPLE_CC);
+  footSwitches[1].scan( timeTS, // CC   Use Case
+    (RegTS.read() & 0x0040) == 0,  66,  E_UC_SIMPLE_CC);
+  //modeSwitch.scan( timeTS,
   //  (RegTS.read() & 0x0100) != 0);
 
   // From MCU direct ports.
-  joystickButton.scan(
+  joystickButton.scan( micros(),
     digitalRead(joystickButtonPin) == LOW);
-  rotarySw[0].scan( //                Lf/Rt  Use Case
+  rotarySw[0].scan( micros(), //      Lf/Rt  Use Case
     digitalRead(rotarySwPin[0]) == LOW, 0,   E_UC_ROTARY_CC);
-  rotarySw[1].scan(
+  rotarySw[1].scan( micros(), //      Lf/Rt  Use Case
     digitalRead(rotarySwPin[1]) == LOW, 1,   E_UC_ROTARY_CC);
-  midiCableDetect.scan(
+  midiCableDetect.scan( micros(),
     digitalRead(midiCableDetectPin) == HIGH);
 }
 
-void scan_analogs(uint8_t index)
+void scan_analogs(uint8_t index, uint32_t rTime)
 {
-  analogFilters[index].scan(AnalogA.read(index));
+  analogFilters[index].scan(AnalogA.read(index), rTime);
 }
 
 // Scanning of switches, updating of LEDs in the 4x3 matrix.
@@ -293,24 +293,24 @@ void switch_led_next_column( void )
   switch_led_sync_led_states_this_column();
 }
 
-void switch_led_scan_switches_this_column(void)
+void switch_led_scan_switches_this_column(uint32_t timeTS)
 {
   // LS 7bits are the CC num, MSB is the use case selector between shift and shifted.
   uint8_t ccMap[] = { 128, 106, 102, 129, 107, 103, 93, 108, 104, 92, 109, 105 };
   // Scan the rows.
-  switchLedMatrix[switch_led_scan_column_index].scan(     // Row 1
+  switchLedMatrix[switch_led_scan_column_index].scan( timeTS,     // Row 1
     (RegTS.read() & 0x0001) != 0,
     ccMap[switch_led_scan_column_index] & 0x7f,
     (ccMap[switch_led_scan_column_index] & 0x80) != 0?E_UC_SHIFT:E_UC_SHIFTED_CC);
-  switchLedMatrix[switch_led_scan_column_index + 3].scan( // Row 2
+  switchLedMatrix[switch_led_scan_column_index + 3].scan( timeTS, // Row 2
     (RegTS.read() & 0x0002) != 0,
     ccMap[switch_led_scan_column_index + 3] & 0x7f,
     (ccMap[switch_led_scan_column_index + 3] & 0x80) != 0?E_UC_SHIFT:E_UC_SHIFTED_CC);
-  switchLedMatrix[switch_led_scan_column_index + 6].scan( // Row 3
+  switchLedMatrix[switch_led_scan_column_index + 6].scan( timeTS, // Row 3
     (RegTS.read() & 0x0004) != 0,
     ccMap[switch_led_scan_column_index + 6] & 0x7f,
     (ccMap[switch_led_scan_column_index + 6] & 0x80) != 0?E_UC_SHIFT:E_UC_SHIFTED_CC);
-  switchLedMatrix[switch_led_scan_column_index + 9].scan( // Row 4
+  switchLedMatrix[switch_led_scan_column_index + 9].scan( timeTS, // Row 4
     (RegTS.read() & 0x0008) != 0,
     ccMap[switch_led_scan_column_index + 9] & 0x7f,
     (ccMap[switch_led_scan_column_index + 9] & 0x80) != 0?E_UC_SHIFT:E_UC_SHIFTED_CC);
@@ -329,27 +329,27 @@ void kbd_scan_next_column_sequence( void )
   RegRQ.write(val);
 }
 
-void kbd_scan_keys_this_column(void)
+void kbd_scan_keys_this_column(uint32_t timeRQ, uint32_t timeTS)
 {
   // Scan the rows.
   keyboard[kbd_scan_column_index].scan(      // Row A
-    kbd_scan_column_index,
+    timeTS, kbd_scan_column_index,
     (RegTS.read() & 0x0010) == 0,
     (RegTS.read() & 0x0020) == 0);
   keyboard[kbd_scan_column_index + 8].scan(  // Row B
-    kbd_scan_column_index + 8,
+    timeRQ, kbd_scan_column_index + 8,
     (RegRQ.read() & 0x0100) == 0,
     (RegRQ.read() & 0x0200) == 0);
   keyboard[kbd_scan_column_index + 16].scan( // Row C
-    kbd_scan_column_index + 16,
+    timeRQ, kbd_scan_column_index + 16,
     (RegRQ.read() & 0x0400) == 0,
     (RegRQ.read() & 0x0800) == 0);
   keyboard[kbd_scan_column_index + 24].scan( // Row D
-    kbd_scan_column_index + 24,
+    timeRQ, kbd_scan_column_index + 24,
     (RegRQ.read() & 0x1000) == 0,
     (RegRQ.read() & 0x2000) == 0);
   keyboard[kbd_scan_column_index + 32].scan( // Row E
-    kbd_scan_column_index + 32,
+    timeRQ, kbd_scan_column_index + 32,
     (RegRQ.read() & 0x4000) == 0,
     (RegRQ.read() & 0x8000) == 0);
 
@@ -360,7 +360,7 @@ void kbd_scan_keys_this_column(void)
 // Callbacks / hook functions.
 void setLed(bool val)
 {
-  ledPreviousMillis = millis();
+  ledPreviousMicros = micros();
   ledState = val;
   digitalWrite(ledPin, ledState);
 }
@@ -748,7 +748,6 @@ void handleProgCh(uint8_t pcVal, uint8_t channel)
 }
 
 // The setup() function runs once at startup.
-unsigned long lastCycleTimestamp = 0;
 void setup()
 {
   // Initialize LED for flashing.
@@ -813,25 +812,34 @@ void setup()
   // E_SS_SYS - both on
   switchLedMatrix[switchLedSeq[0]].setLedState(true, E_SS_SYS); // Transpose LED
   switchLedMatrix[switchLedSeq[1]].setLedState(true, E_SS_SYS); // Prog Change LED
-
-  lastCycleTimestamp = micros();
 }
 
 // The loop() function runs over and over again.
 
-#define CYCLE_WIN_SZ 8
+#define CYCLE_WIN_SZ 32
 unsigned long cycleTimes[CYCLE_WIN_SZ] = { 0 };
 unsigned long cycleTime = 0;
 int cycleInd = 0;
 
+void update_cycle_time(uint32_t delta)
+{
+  cycleTime -= cycleTimes[cycleInd];
+  cycleTimes[cycleInd] = delta;
+  cycleTime += cycleTimes[cycleInd];
+  
+  if (cycleInd < (CYCLE_WIN_SZ - 1))
+    cycleInd++;
+  else
+    cycleInd = 0;
+}
+
 void loop()
 {
-  unsigned long currentMillis = millis();
+  unsigned long currentMicros = micros();
   static unsigned led = 0;
-  unsigned long thisCycleTimestamp = micros();
-  if (currentMillis - ledPreviousMillis >= ledBlinkInterval) {
+  if (currentMicros - ledPreviousMicros >= ledBlinkInterval) {
     // save the last time you blinked the LED
-    ledPreviousMillis = currentMillis;
+    ledPreviousMicros = currentMicros;
 
     if (debug_mode) {
       // In debug mode, the LED flashes, toggling every ledBlickInterval.
@@ -855,6 +863,8 @@ void loop()
       }
       led++;
       led %= 12;
+//      Serial.print(F("Profile Cycle Time: "));
+//      Serial.println(cycleTime);
     }
   }
 
@@ -870,23 +880,28 @@ void loop()
   RegRQ.syncIn();
   RegTS.syncIn();
 
-  kbd_scan_keys_this_column();
-  switch_led_scan_switches_this_column();
-  scan_switches();
+  kbd_scan_keys_this_column(RegRQ.syncdInAt(), RegTS.syncdInAt());
+  switch_led_scan_switches_this_column(RegTS.syncdInAt());
+  scan_switches(RegTS.syncdInAt());
 
   // Read in from the AD7997 analog ports.
+#if 0
   AnalogA.sync(kbd_scan_column_index);
-  scan_analogs(kbd_scan_column_index);
-
-  cycleTime -= cycleTimes[cycleInd];
-  cycleTimes[cycleInd] = micros() - lastCycleTimestamp;
-  cycleTime += cycleTimes[cycleInd];
-  
-  if (cycleInd < (CYCLE_WIN_SZ - 1))
-    cycleInd++;
-  else
-    cycleInd = 0;
-  lastCycleTimestamp = thisCycleTimestamp;
+  uint32_t startTime = micros();
+  scan_analogs(kbd_scan_column_index, AnalogA.syncdAt());
+  uint32_t endTime = micros();
+#else
+  if (kbd_scan_column_index == 0) {
+    AnalogA.sync();
+    uint32_t endTime = AnalogA.syncdAt();
+//    uint32_t startTime = micros();
+    for (unsigned i = 0; i < 8; i++) {
+      scan_analogs(i, endTime);
+    }
+//    uint32_t end2Time = micros();
+//    update_cycle_time(end2Time - startTime);
+  }
+#endif
 
   if (rotaryBrakeStart) {
     // Rotary brake mode timer active.
@@ -904,5 +919,7 @@ void loop()
 
   // Check for and handle receive MIDI messages.
   midiJacks.receiveScan();
+
+  //update_cycle_time(endTime - startTime);
 }
 

@@ -53,7 +53,7 @@ class CFilter
       const PROGMEM uint16_t minMargin, const PROGMEM uint16_t maxv, const PROGMEM uint16_t maxMargin,
       const uint8_t ccNum = 255, const uint8_t useCase = 0);
     ~CFilter(void);
-    void scan(int sample);
+    void scan(int sample, uint32_t sTime);
     bool atOrigin(void) { return (m_region == E_FILT_AT_ORIGIN) && (m_state == E_FILT_REST); }
     enum region inRegion(int sample)
     {

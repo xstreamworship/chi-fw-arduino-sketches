@@ -44,7 +44,7 @@ class CMidiKeySwitch
     CMidiKeySwitch(char * const PROGMEM noteName);
     ~CMidiKeySwitch(void);
     static inline uint8_t getMidiCh(void) { return s_midi_ch; }
-    void scan(uint8_t key, bool nc, bool no);
+    void scan(uint32_t sTime, uint8_t key, bool nc, bool no);
 };
 
 #endif

@@ -29,7 +29,7 @@ CMidiKeySwitch::~CMidiKeySwitch(void)
 {
 }
 
-void CMidiKeySwitch::scan(uint8_t key, bool nc, bool no)
+void CMidiKeySwitch::scan(uint32_t sTime, uint8_t key, bool nc, bool no)
 {
   uint8_t note = key + E_NOTE_A1_OFFSET;
   if (nc)
@@ -39,23 +39,23 @@ void CMidiKeySwitch::scan(uint8_t key, bool nc, bool no)
     {
       // Illegal, switch cannot be both NC and NO.
       s_glitchCount++;
-      stateError(note, micros(), key, nc, no);
+      stateError(note, sTime, key, nc, no);
       return;
     }
     switch (m_state)
     {
       case E_NOTE_OFF:
         // Do nothing but refresh start time.
-        m_timeStart = micros();
+        m_timeStart = sTime;
         break;
       case E_NC_OPENED:
         // False note-on - cancel it.
         m_state = E_NOTE_OFF;
         // Refresh start time.
-        m_timeStart = micros();
+        m_timeStart = sTime;
         break;
       default:
-        stateError(note, micros(), key, nc, no);
+        stateError(note, sTime, key, nc, no);
         // fall through
       case E_NOTE_ON:
         // Rapid transition from note on to note off.
@@ -64,10 +64,10 @@ void CMidiKeySwitch::scan(uint8_t key, bool nc, bool no)
         // fall through
       case E_NO_OPENED:
         // Complete the note-off
-        noteOff(note, micros() - m_timeStart);
+        noteOff(note, sTime - m_timeStart);
         m_state = E_NOTE_OFF;
         // Refresh start time.
-        m_timeStart = micros();
+        m_timeStart = sTime;
         break;
     }
   }
@@ -76,7 +76,7 @@ void CMidiKeySwitch::scan(uint8_t key, bool nc, bool no)
     switch (m_state)
     {
       default:
-        stateError(note, micros(), key, nc, no);
+        stateError(note, sTime, key, nc, no);
         // fall through
       case E_NOTE_OFF:
         // Rapid transition from note off to note on.
@@ -85,20 +85,20 @@ void CMidiKeySwitch::scan(uint8_t key, bool nc, bool no)
         // fall through
       case E_NC_OPENED:
         // Complete the note-on.
-        noteOn(note, micros() - m_timeStart);
+        noteOn(note, sTime - m_timeStart);
         m_state = E_NOTE_ON;
         // Refresh start time.
-        m_timeStart = micros();
+        m_timeStart = sTime;
         break;
       case E_NOTE_ON:
         // Do nothing but refresh start time.
-        m_timeStart = micros();
+        m_timeStart = sTime;
         break;
       case E_NO_OPENED:
         // False note-off - cancel it.
         m_state = E_NOTE_ON;
         // Refresh start time.
-        m_timeStart = micros();
+        m_timeStart = sTime;
         break;
     }
   }
@@ -108,11 +108,11 @@ void CMidiKeySwitch::scan(uint8_t key, bool nc, bool no)
     {
       case E_NOTE_OFF:
         // Initiate a note-on with properly scanned start time.
-        m_timeStart = micros();
+        m_timeStart = sTime;
         m_state = E_NC_OPENED;
         break;
       default:
-        stateError(note, micros(), key, nc, no);
+        stateError(note, sTime, key, nc, no);
         // fall through
       case E_NC_OPENED:
       case E_NO_OPENED:
@@ -120,7 +120,7 @@ void CMidiKeySwitch::scan(uint8_t key, bool nc, bool no)
         break;
       case E_NOTE_ON:
         // Initiate a note-off with properly scanned start time.
-        m_timeStart = micros();
+        m_timeStart = sTime;
         m_state = E_NO_OPENED;
         break;
         break;

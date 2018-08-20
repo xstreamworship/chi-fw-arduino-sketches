@@ -12,6 +12,19 @@
 
 #include "Arduino.h"
 
+union UCat9555Reg
+{
+  // Cat9555 register is little endian, assuming CPU is little endian.
+  uint16_t val;
+  uint8_t raw_val[2];
+};
+
+struct __attribute__ ((packed)) SCat9555Buf
+{
+  uint8_t cmd;
+  union UCat9555Reg port;
+};
+
 class CCat9555
 {
   private:
@@ -26,10 +39,11 @@ class CCat9555
     {
       E_NUM_PORTS = 2,
     };
+    uint32_t m_readAt;
     const uint8_t m_i2cAddr;
     const uint16_t m_portConfig;
-    uint16_t m_inValue;
-    uint16_t m_outValue;
+    SCat9555Buf m_in;
+    SCat9555Buf m_out;
     unsigned m_errCnt;
 
   public:
@@ -37,9 +51,10 @@ class CCat9555
     ~CCat9555(void);
     void begin(uint16_t outValue = 0xffff);
     void syncOut(void);
-    void syncIn(void);
-    inline void write(uint16_t outValue) { m_outValue = outValue; }
-    inline uint16_t read(void) { return (m_inValue & m_portConfig) | (m_outValue & ~ m_portConfig); }
+    uint32_t syncIn(void);
+    inline uint32_t syncdInAt(void) { return m_readAt; }
+    inline void write(uint16_t outValue) { m_out.port.val = outValue; }
+    inline uint16_t read(void) { return (m_in.port.val & m_portConfig) | (m_out.port.val & ~ m_portConfig); }
 
   public:
     static inline uint8_t lsb_of(uint16_t val) { return val & 0xff; }
