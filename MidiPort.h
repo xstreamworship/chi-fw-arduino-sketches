@@ -136,8 +136,9 @@ class CMidiPort
     {
       while ((m_serial.available() > 0) && --polls) {
         if (!parseMidi(m_serial.read()))
-          return;
+          return false;
       }
+      return true;
     }
 };
 

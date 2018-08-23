@@ -796,7 +796,7 @@ void setup()
 #ifndef FORCE_DEBUG
     Serial.begin(230400);
 #endif
-    Serial.println(F("Chi - stage 1 version 1"));
+    Serial.println(F("Chi - stage 2 version 1"));
   }
 
   // Set up the shift state overlays to indicate the modes
@@ -863,46 +863,55 @@ void loop()
       }
       led++;
       led %= 12;
-//      Serial.print(F("Profile Cycle Time: "));
-//      Serial.println(cycleTime);
+      //Serial.print(F("Profile Cycle Time: "));
+      //Serial.println(cycleTime / CYCLE_WIN_SZ);
     }
   }
 
+  //uint32_t startTime = micros();
   kbd_scan_next_column_sequence();
   switch_led_next_column();
   switch_led_sync_led_states_this_column();
+  //uint32_t endTime = micros();
 
   // Synchronize with the hardware
   // I2C write
+  //uint32_t startTime = micros();
   RegRQ.syncOut();
   RegTS.syncOut();
   // I2C read
   RegRQ.syncIn();
   RegTS.syncIn();
+  //uint32_t endTime = micros();
 
+  //uint32_t startTime = micros();
   kbd_scan_keys_this_column(RegRQ.syncdInAt(), RegTS.syncdInAt());
   switch_led_scan_switches_this_column(RegTS.syncdInAt());
   scan_switches(RegTS.syncdInAt());
+  //uint32_t endTime = micros();
 
   // Read in from the AD7997 analog ports.
 #if 0
   AnalogA.sync(kbd_scan_column_index);
-  uint32_t startTime = micros();
+  //uint32_t startTime = micros();
   scan_analogs(kbd_scan_column_index, AnalogA.syncdAt());
-  uint32_t endTime = micros();
+  //uint32_t endTime = micros();
 #else
   if (kbd_scan_column_index == 0) {
+    //uint32_t startTime = micros();
     AnalogA.sync();
     uint32_t endTime = AnalogA.syncdAt();
-//    uint32_t startTime = micros();
+    //update_cycle_time(endTime - startTime);
+    //uint32_t startTime = micros();
     for (unsigned i = 0; i < 8; i++) {
       scan_analogs(i, endTime);
     }
-//    uint32_t end2Time = micros();
-//    update_cycle_time(end2Time - startTime);
+    //uint32_t end2Time = micros();
+    //update_cycle_time(end2Time - startTime);
   }
 #endif
 
+  //uint32_t startTime = micros();
   if (rotaryBrakeStart) {
     // Rotary brake mode timer active.
     if ((micros() - rotaryBrakeStart) > 250000) {
@@ -919,6 +928,7 @@ void loop()
 
   // Check for and handle receive MIDI messages.
   midiJacks.receiveScan();
+  //uint32_t endTime = micros();
 
   //update_cycle_time(endTime - startTime);
 }

@@ -307,6 +307,8 @@ void twi_wait_until_master_ready(void)
 	while (master_busy)
 	{
 	}
+//  if (done_at_time)
+//    *done_at_time = micros();
 }
 
 /////////////////////////////////////////////////////////////////////
