@@ -28,8 +28,10 @@ const int rotarySwPin[2] =  {8, 9}; // pin address
 const int midiCableDetectPin =  6; // pin address
 
 // Bit masks to setup the digital I/O pins of CAT9555 ports.
-const uint16_t REG_RQ_PORT_CONFIG = 0xff00;
-const uint16_t REG_TS_PORT_CONFIG = 0x01ff;
+const uint16_t REG_Q_PORT_CONFIG = 0x00;
+const uint16_t REG_R_PORT_CONFIG = 0xff;
+const uint16_t REG_S_PORT_CONFIG = 0xff;
+const uint16_t REG_T_PORT_CONFIG = 0x01;
 
 // Variables
 bool ledState = LOW; // used to set the LED
@@ -40,9 +42,11 @@ bool debug_mode;
 CAd7997 AnalogA(34); // I2C address
 
 // Digital I/O
-// CAT9555 registers are designated in hardware port (i.e. little endian) order.
-CCat9555 RegRQ(32, REG_RQ_PORT_CONFIG); // I2C address and port config
-CCat9555 RegTS(33, REG_TS_PORT_CONFIG); // I2C address and port config
+// CAT9555 registers are designated in hardware port order.
+CCat9555 RegQ(32, 0, REG_Q_PORT_CONFIG); // I2C address and port config
+CCat9555 RegR(32, 1, REG_R_PORT_CONFIG); // I2C address and port config
+CCat9555 RegS(33, 0, REG_S_PORT_CONFIG); // I2C address and port config
+CCat9555 RegT(33, 1, REG_T_PORT_CONFIG); // I2C address and port config
 
 // Analog filters
 enum EAUseCase
@@ -224,15 +228,17 @@ enum EUseCase
 };
 
 // Regular scanning of input switches.
-void scan_switches(uint32_t timeTS)
+void scan_switches( void )
 {
+  uint32_t timeS = RegS.syncdInAt();
+//  uint32_t timeT = RegT.syncdInAt();
   // From CAT9555 ports.
-  footSwitches[0].scan( timeTS, // CC   Use Case
-    (RegTS.read() & 0x0080) == 0,  64,  E_UC_SIMPLE_CC);
-  footSwitches[1].scan( timeTS, // CC   Use Case
-    (RegTS.read() & 0x0040) == 0,  66,  E_UC_SIMPLE_CC);
-  //modeSwitch.scan( timeTS,
-  //  (RegTS.read() & 0x0100) != 0);
+  footSwitches[0].scan( timeS, // CC   Use Case
+    (RegS.read() & 0x80) == 0,  64,  E_UC_SIMPLE_CC);
+  footSwitches[1].scan( timeS, // CC   Use Case
+    (RegS.read() & 0x40) == 0,  66,  E_UC_SIMPLE_CC);
+  //modeSwitch.scan( timeT,
+  //  (RegT.read() & 0x01) != 0);
 
   // From MCU direct ports.
   joystickButton.scan( micros(),
@@ -264,54 +270,55 @@ enum EShiftStates
 };
 enum EShiftStates shiftState = E_SS_UNSHIFTED;
 
-void switch_led_sync_led_states_this_column(void)
+void switch_led_sync_led_states_this_column( void )
 {
-  const uint16_t mask = 0xe1ff;
-  uint16_t val = (RegTS.read() & mask);
+  const uint8_t mask = 0xe1;
+  uint8_t val = (RegT.read() & mask);
 
   if (switchLedMatrix[switch_led_scan_column_index].ledState(shiftState))     // Row 1
-    val |= 0x1000;
+    val |= 0x10;
   if (switchLedMatrix[switch_led_scan_column_index + 3].ledState(shiftState)) // Row 2
-    val |= 0x0800;
+    val |= 0x08;
   if (switchLedMatrix[switch_led_scan_column_index + 6].ledState(shiftState)) // Row 3
-    val |= 0x0400;
+    val |= 0x04;
   if (switchLedMatrix[switch_led_scan_column_index + 9].ledState(shiftState)) // Row 4
-    val |= 0x0200;
+    val |= 0x02;
 
-  RegTS.write(val); 
+  RegT.write(val); 
 }
 
 void switch_led_next_column( void )
 {
-  uint16_t pattern[3] = { 0x6000, 0xa000, 0xc000 };
-  const uint16_t mask = 0x1fff;
+  uint8_t pattern[3] = { 0x60, 0xa0, 0xc0 };
+  const uint8_t mask = 0x1f;
   
   // Select the column to scan.
   switch_led_scan_column_index = (switch_led_scan_column_index + 1) % 3;
-  uint16_t val = (RegTS.read() & mask) | pattern[switch_led_scan_column_index];
-  RegTS.write(val);
+  uint16_t val = (RegT.read() & mask) | pattern[switch_led_scan_column_index];
+  RegT.write(val);
   switch_led_sync_led_states_this_column();
 }
 
-void switch_led_scan_switches_this_column(uint32_t timeTS)
+void switch_led_scan_switches_this_column( void )
 {
+  uint32_t timeS = RegS.syncdInAt();
   // LS 7bits are the CC num, MSB is the use case selector between shift and shifted.
   uint8_t ccMap[] = { 128, 106, 102, 129, 107, 103, 93, 108, 104, 92, 109, 105 };
   // Scan the rows.
-  switchLedMatrix[switch_led_scan_column_index].scan( timeTS,     // Row 1
-    (RegTS.read() & 0x0001) != 0,
+  switchLedMatrix[switch_led_scan_column_index].scan( timeS,     // Row 1
+    (RegS.read() & 0x01) != 0,
     ccMap[switch_led_scan_column_index] & 0x7f,
     (ccMap[switch_led_scan_column_index] & 0x80) != 0?E_UC_SHIFT:E_UC_SHIFTED_CC);
-  switchLedMatrix[switch_led_scan_column_index + 3].scan( timeTS, // Row 2
-    (RegTS.read() & 0x0002) != 0,
+  switchLedMatrix[switch_led_scan_column_index + 3].scan( timeS, // Row 2
+    (RegS.read() & 0x02) != 0,
     ccMap[switch_led_scan_column_index + 3] & 0x7f,
     (ccMap[switch_led_scan_column_index + 3] & 0x80) != 0?E_UC_SHIFT:E_UC_SHIFTED_CC);
-  switchLedMatrix[switch_led_scan_column_index + 6].scan( timeTS, // Row 3
-    (RegTS.read() & 0x0004) != 0,
+  switchLedMatrix[switch_led_scan_column_index + 6].scan( timeS, // Row 3
+    (RegS.read() & 0x04) != 0,
     ccMap[switch_led_scan_column_index + 6] & 0x7f,
     (ccMap[switch_led_scan_column_index + 6] & 0x80) != 0?E_UC_SHIFT:E_UC_SHIFTED_CC);
-  switchLedMatrix[switch_led_scan_column_index + 9].scan( timeTS, // Row 4
-    (RegTS.read() & 0x0008) != 0,
+  switchLedMatrix[switch_led_scan_column_index + 9].scan( timeS, // Row 4
+    (RegS.read() & 0x08) != 0,
     ccMap[switch_led_scan_column_index + 9] & 0x7f,
     (ccMap[switch_led_scan_column_index + 9] & 0x80) != 0?E_UC_SHIFT:E_UC_SHIFTED_CC);
 }
@@ -324,34 +331,34 @@ void kbd_scan_next_column_sequence( void )
   byte pattern[8] = { 0xfe, 0xfd, 0xfb, 0xf7, 0xef, 0xdf, 0xbf, 0x7f };
 
   // Select the column to scan.
-  uint16_t val = RegRQ.read();
-  CCat9555::set_lsb(val, pattern[kbd_scan_column_index]);
-  RegRQ.write(val);
+  RegQ.write(pattern[kbd_scan_column_index]);
 }
 
-void kbd_scan_keys_this_column(uint32_t timeRQ, uint32_t timeTS)
+void kbd_scan_keys_this_column( void )
 {
+  uint32_t timeR = RegR.syncdInAt();
+  uint32_t timeS = RegS.syncdInAt();
   // Scan the rows.
   keyboard[kbd_scan_column_index].scan(      // Row A
-    timeTS, kbd_scan_column_index,
-    (RegTS.read() & 0x0010) == 0,
-    (RegTS.read() & 0x0020) == 0);
+    timeS, kbd_scan_column_index,
+    (RegS.read() & 0x10) == 0,
+    (RegS.read() & 0x20) == 0);
   keyboard[kbd_scan_column_index + 8].scan(  // Row B
-    timeRQ, kbd_scan_column_index + 8,
-    (RegRQ.read() & 0x0100) == 0,
-    (RegRQ.read() & 0x0200) == 0);
+    timeR, kbd_scan_column_index + 8,
+    (RegR.read() & 0x01) == 0,
+    (RegR.read() & 0x02) == 0);
   keyboard[kbd_scan_column_index + 16].scan( // Row C
-    timeRQ, kbd_scan_column_index + 16,
-    (RegRQ.read() & 0x0400) == 0,
-    (RegRQ.read() & 0x0800) == 0);
+    timeR, kbd_scan_column_index + 16,
+    (RegR.read() & 0x04) == 0,
+    (RegR.read() & 0x08) == 0);
   keyboard[kbd_scan_column_index + 24].scan( // Row D
-    timeRQ, kbd_scan_column_index + 24,
-    (RegRQ.read() & 0x1000) == 0,
-    (RegRQ.read() & 0x2000) == 0);
+    timeR, kbd_scan_column_index + 24,
+    (RegR.read() & 0x10) == 0,
+    (RegR.read() & 0x20) == 0);
   keyboard[kbd_scan_column_index + 32].scan( // Row E
-    timeRQ, kbd_scan_column_index + 32,
-    (RegRQ.read() & 0x4000) == 0,
-    (RegRQ.read() & 0x8000) == 0);
+    timeR, kbd_scan_column_index + 32,
+    (RegR.read() & 0x40) == 0,
+    (RegR.read() & 0x80) == 0);
 
   // Advance to next column.
   kbd_scan_column_index = (kbd_scan_column_index + 1) % 8;
@@ -747,6 +754,91 @@ void handleProgCh(uint8_t pcVal, uint8_t channel)
   syncLedsToProgChange();
 }
 
+#if 0
+enum I2C_Thread_States
+{
+  ITS_IDLE = 0,
+  ITS_LEDSW_T_OUT,
+  ITS_LEDSW_S_IN,
+  ITS_KEYBD_Q_OUT,
+  ITS_KEYBD_R_IN,
+  ITS_KEYBD_S_IN,
+  ITS_ANALOG_IN,
+
+  ITS_NUM_STATES
+};
+
+enum I2C_Reg_States
+{
+  IRS_IDLE = 0,
+  IRS_READY,
+  IRS_ISR_BUSY,
+  IRS_ISR_DONE,
+
+  IRS_NUM_STATES
+};
+
+enum I2C_Misc_Parms
+{
+  LEDSW_NUM_COL = 3,
+  KEYBD_NUM_COL = 8,
+  ANALOG_NUM_CH = 8,
+
+  REG_QR_I2C_ADDR = 32,
+  REG_ST_I2C_ADDR = 33,
+  ANALOG_I2C_ADDR = 34,
+};
+
+struct RegDigIn
+{
+  uint32_t m_timeRead;
+  uint8_t m_valueRead;
+};
+
+struct RegDigRSIn
+{
+  struct RegDigIn R;
+  struct RegDigIn S;
+  enum I2C_Reg_States m_state;
+};
+
+struct RegDigRSIn keyboardSwitchInputs[KEYBD_NUM_COL] = { 0 };
+uint8_t keyboardSwitchCol = 0;
+struct RegDigIn ledSwitchInputs[LEDSW_NUM_COL] = { 0 };
+uint8_t ledSwitchCol = 0;
+enum I2C_Thread_States i2cIsrState = ITS_IDLE;
+
+
+
+// Handle I2C transactions
+void complete(void)
+{
+  switch (i2cIsrState)
+  {
+    case ITS_LEDSW_T_OUT:
+      // Done sending reg T out.
+      //  - selecting LED / switch column.
+      //  - setting the LED outputs for the cross section of the rows.
+      // Next, read reg S, switch input values for the cross section of the rows.
+//      twi_initiate_transaction(REG_ST_I2C_ADDR, uint8_t *data_wr, uint8_t bytes_wr,
+//  uint8_t *data_rd, uint8_t bytes_rd, uint32_t *doneAtPtr = NULL);
+      break;
+    case ITS_LEDSW_S_IN:
+      break;
+    case ITS_KEYBD_Q_OUT:
+      break;
+    case ITS_KEYBD_R_IN:
+      break;
+    case ITS_KEYBD_S_IN:
+      break;
+    case ITS_ANALOG_IN:
+      break;
+    default:
+      break;
+  }
+}
+#endif
+
 // The setup() function runs once at startup.
 void setup()
 {
@@ -774,16 +866,18 @@ void setup()
   twi_init(16000000UL, wireClockFrequency);
 
   // Probe and initialize the CAT9555 expansion ports.
-  RegRQ.begin();
-  RegTS.begin();
+  RegQ.begin();
+  RegR.begin();
+  RegS.begin();
+  RegT.begin();
 
   // Probe and initialize the AD7997 analog ports.
   AnalogA.begin();
 
   // Read in so we can check the mode switch at startup.
 #ifndef FORCE_DEBUG
-  RegTS.syncIn();
-  debug_mode = ((RegTS.read() & 0x0100) != 0);
+  RegT.syncIn();
+  debug_mode = ((RegT.read() & 0x01) != 0);
 #else
   debug_mode = true;
 #endif
@@ -877,17 +971,21 @@ void loop()
   // Synchronize with the hardware
   // I2C write
   //uint32_t startTime = micros();
-  RegRQ.syncOut();
-  RegTS.syncOut();
+  RegQ.syncOut();
+  RegR.syncOut();
+  RegS.syncOut();
+  RegT.syncOut();
   // I2C read
-  RegRQ.syncIn();
-  RegTS.syncIn();
+  RegQ.syncIn();
+  RegR.syncIn();
+  RegS.syncIn();
+  RegT.syncIn();
   //uint32_t endTime = micros();
 
   //uint32_t startTime = micros();
-  kbd_scan_keys_this_column(RegRQ.syncdInAt(), RegTS.syncdInAt());
-  switch_led_scan_switches_this_column(RegTS.syncdInAt());
-  scan_switches(RegTS.syncdInAt());
+  kbd_scan_keys_this_column();
+  switch_led_scan_switches_this_column();
+  scan_switches();
   //uint32_t endTime = micros();
 
   // Read in from the AD7997 analog ports.

@@ -11,25 +11,25 @@
 #include "Cat9555.h"
 #include "twi_if.h"
 
-CCat9555::CCat9555(const uint8_t i2cAddr, const uint16_t portConfig) :
+CCat9555::CCat9555(const uint8_t i2cAddr, const uint8_t portNum, const uint8_t portConfig) :
   m_readAt(0),
   m_i2cAddr(i2cAddr),
-  m_portConfig(portConfig),
-  m_errCnt(0)
+  m_portNum(portNum),
+  m_portConfig(portConfig)
 {
-  m_in.port.val = 0xffff;
-  m_out.port.val = 0xffff;
+  m_in.port = 0xff;
+  m_out.port = 0xff;
 }
 
 CCat9555::~CCat9555(void)
 {
 }
 
-void CCat9555::begin(uint16_t outValue)
+void CCat9555::begin(uint8_t outValue)
 {
   // Setup the port configuration.
-  m_out.cmd = ECREG_PORT_CONFIG;
-  m_out.port.val = m_portConfig;
+  m_out.cmd = ECREG_PORT_CONFIG + m_portNum;
+  m_out.port = m_portConfig;
   twi_initiate_write(m_i2cAddr, (uint8_t *)(&m_out), sizeof(m_out));
   twi_wait_until_master_ready();
 
@@ -41,19 +41,28 @@ void CCat9555::begin(uint16_t outValue)
   syncIn();
 }
 
+void CCat9555::startOut(void)
+{
+  m_out.cmd = ECREG_OUTPUT + m_portNum;
+  twi_initiate_write(m_i2cAddr, (uint8_t *)(&m_out), sizeof(m_out));
+}
+
+void CCat9555::startIn(void)
+{
+  m_in.cmd = ECREG_INPUT + m_portNum;
+  twi_initiate_transaction(m_i2cAddr, &m_in.cmd, sizeof(m_in.cmd), m_in.port, sizeof(m_in.port), &m_readAt);
+}
+
 void CCat9555::syncOut(void)
 {
-  m_out.cmd = ECREG_OUTPUT;
-  twi_initiate_write(m_i2cAddr, (uint8_t *)(&m_out), sizeof(m_out));
+  startOut();
   twi_wait_until_master_ready();
 }
 
-uint32_t CCat9555::syncIn(void)
+void CCat9555::syncIn(void)
 {
-  m_in.cmd = ECREG_INPUT;
-  twi_initiate_transaction(m_i2cAddr, &m_in.cmd, sizeof(m_in.cmd), m_in.port.raw_val, sizeof(m_in.port.raw_val), &m_readAt);
+  startIn();
   twi_wait_until_master_ready();
-  return m_readAt;
 }
 
 #if 0

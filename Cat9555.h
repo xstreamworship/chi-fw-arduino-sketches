@@ -11,18 +11,12 @@
 #define __CAT9555_H
 
 #include "Arduino.h"
-
-union UCat9555Reg
-{
-  // Cat9555 register is little endian, assuming CPU is little endian.
-  uint16_t val;
-  uint8_t raw_val[2];
-};
+#include "twi_if.h"
 
 struct __attribute__ ((packed)) SCat9555Buf
 {
   uint8_t cmd;
-  union UCat9555Reg port;
+  uint8_t port;
 };
 
 class CCat9555
@@ -40,27 +34,24 @@ class CCat9555
       E_NUM_PORTS = 2,
     };
     uint32_t m_readAt;
-    const uint8_t m_i2cAddr;
-    const uint16_t m_portConfig;
     SCat9555Buf m_in;
     SCat9555Buf m_out;
-    unsigned m_errCnt;
+    const uint8_t m_portConfig;
+    const uint8_t m_i2cAddr;
+    const uint8_t m_portNum;
 
   public:
-    CCat9555(const uint8_t i2cAddr, const uint16_t portConfig);
+    CCat9555(const uint8_t i2cAddr, const uint8_t portNum, const uint8_t portConfig);
     ~CCat9555(void);
-    void begin(uint16_t outValue = 0xffff);
+    void begin(uint8_t outValue = 0xff);
+    void startOut(void);
+    void startIn(void);
     void syncOut(void);
-    uint32_t syncIn(void);
+    void syncIn(void);
+    bool isBusy(void) { return twi_busy(); }
     inline uint32_t syncdInAt(void) { return m_readAt; }
-    inline void write(uint16_t outValue) { m_out.port.val = outValue; }
-    inline uint16_t read(void) { return (m_in.port.val & m_portConfig) | (m_out.port.val & ~ m_portConfig); }
-
-  public:
-    static inline uint8_t lsb_of(uint16_t val) { return val & 0xff; }
-    static inline uint8_t msb_of(uint16_t val) { return (val >> 8) & 0xff; }
-    static inline void set_lsb(uint16_t &targ, uint8_t val) { targ = (targ & 0xff00) | (val & 0x00ff); }
-    static inline void set_msb(uint16_t &targ, uint8_t val) { targ = (targ & 0x00ff) | (val << 8) & 0xff00; }
+    inline void write(uint8_t outValue) { m_out.port = outValue; }
+    inline uint16_t read(void) { return (m_in.port & m_portConfig) | (m_out.port & ~ m_portConfig); }
 };
 
 #endif
