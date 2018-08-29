@@ -15,14 +15,14 @@
 class CFilter
 {
   private:
-    const PROGMEM char *m_filterName;
-    const PROGMEM uint16_t m_threshold;
-    const PROGMEM uint16_t m_origin;
-    const PROGMEM uint16_t m_originMargin;
-    const PROGMEM uint16_t m_min;
-    const PROGMEM uint16_t m_minMargin;
-    const PROGMEM uint16_t m_max;
-    const PROGMEM uint16_t m_maxMargin;
+    const char *m_filterName;
+    const uint16_t m_threshold;
+    const uint16_t m_origin;
+    const uint16_t m_originMargin;
+    const uint16_t m_min;
+    const uint16_t m_minMargin;
+    const uint16_t m_max;
+    const uint16_t m_maxMargin;
     enum
     {
       E_TIMEDEBOUNCE = 30000,
@@ -48,9 +48,9 @@ class CFilter
     const uint8_t m_useCase;
 
   public:
-    CFilter(const PROGMEM char *filterName, const PROGMEM uint16_t thresh,
-      const PROGMEM uint16_t origin, const PROGMEM uint16_t originMargin, const PROGMEM uint16_t minv,
-      const PROGMEM uint16_t minMargin, const PROGMEM uint16_t maxv, const PROGMEM uint16_t maxMargin,
+    CFilter(const char *filterName, const uint16_t thresh,
+      const uint16_t origin, const uint16_t originMargin, const uint16_t minv,
+      const uint16_t minMargin, const uint16_t maxv, const uint16_t maxMargin,
       const uint8_t ccNum = 255, const uint8_t useCase = 0);
     ~CFilter(void);
     void scan(int sample, uint32_t sTime);

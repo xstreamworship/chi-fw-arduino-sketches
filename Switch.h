@@ -26,7 +26,7 @@ class CSwitch
     enum state m_state;
     uint8_t m_ledState;
     bool m_stateStatus;
-    char * const PROGMEM m_switchName;
+    const char * m_switchName;
     enum
     {
       E_TIMEDEBOUNCE = 30000,
@@ -35,7 +35,7 @@ class CSwitch
     void switchOff(uint8_t ccNum, uint8_t uCase);
 
   public:
-    CSwitch(const PROGMEM char *switchName);
+    CSwitch(const char *switchName);
     ~CSwitch(void);
     bool switchState(void) { return m_stateStatus; }
     void scan(uint32_t sTime, bool state, uint8_t ccNum = 255, uint8_t uCase = 0);

@@ -50,7 +50,7 @@ void CCat9555::startOut(void)
 void CCat9555::startIn(void)
 {
   m_in.cmd = ECREG_INPUT + m_portNum;
-  twi_initiate_transaction(m_i2cAddr, &m_in.cmd, sizeof(m_in.cmd), m_in.port, sizeof(m_in.port), &m_readAt);
+  twi_initiate_transaction(m_i2cAddr, &m_in.cmd, sizeof(m_in.cmd), &m_in.port, sizeof(m_in.port), &m_readAt);
 }
 
 void CCat9555::syncOut(void)

@@ -14,9 +14,9 @@
 extern bool debug_mode;
 void analogChanged(bool state, uint16_t val, uint8_t ccNum, uint8_t uCase);
 
-CFilter::CFilter(const PROGMEM char *filterName, const PROGMEM uint16_t thresh,
-      const PROGMEM uint16_t origin, const PROGMEM uint16_t originMargin, const PROGMEM uint16_t minv,
-      const PROGMEM uint16_t minMargin, const PROGMEM uint16_t maxv, const PROGMEM uint16_t maxMargin,
+CFilter::CFilter(const char *filterName, const uint16_t thresh,
+      const uint16_t origin, const uint16_t originMargin, const uint16_t minv,
+      const uint16_t minMargin, const uint16_t maxv, const uint16_t maxMargin,
       const uint8_t ccNum, const uint8_t useCase) :
   m_filterName(filterName),
   m_threshold(thresh),

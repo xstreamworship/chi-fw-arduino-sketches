@@ -14,7 +14,7 @@
 extern bool debug_mode;
 void switchChanged(bool state, uint8_t ccNum, uint8_t uCase);
 
-CSwitch::CSwitch(const PROGMEM char *switchName) :
+CSwitch::CSwitch(const char *switchName) :
   m_switchName(switchName),
   m_state(E_SW_OFF),
   m_stateStatus(false),

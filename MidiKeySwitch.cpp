@@ -15,10 +15,10 @@ extern bool debug_mode;
 void noteOn(uint8_t note, uint8_t velocity, uint8_t channel);
 void noteOff(uint8_t note, uint8_t velocity, uint8_t channel);
 
-static unsigned long CMidiKeySwitch::s_glitchCount = 0;
-static uint8_t CMidiKeySwitch::s_midi_ch = 0;
+unsigned long CMidiKeySwitch::s_glitchCount = 0;
+uint8_t CMidiKeySwitch::s_midi_ch = 0;
 
-CMidiKeySwitch::CMidiKeySwitch(char * const PROGMEM noteName) :
+CMidiKeySwitch::CMidiKeySwitch(const char * const PROGMEM noteName) :
   m_noteName(noteName),
   m_state(E_NOTE_OFF),
   m_timeStart(0)

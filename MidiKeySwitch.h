@@ -16,7 +16,7 @@ class CMidiKeySwitch
 {
   private:
     unsigned long m_timeStart;
-    char * const PROGMEM m_noteName;
+    const char * const PROGMEM m_noteName;
     enum properties
     {
       E_DEFAULT_VELOCITY = 64,
@@ -41,7 +41,7 @@ class CMidiKeySwitch
     void stateError(uint8_t note, unsigned long ttime, uint8_t key, bool nc, bool no);
 
   public:
-    CMidiKeySwitch(char * const PROGMEM noteName);
+    CMidiKeySwitch(const char * const PROGMEM noteName);
     ~CMidiKeySwitch(void);
     static inline uint8_t getMidiCh(void) { return s_midi_ch; }
     void scan(uint32_t sTime, uint8_t key, bool nc, bool no);

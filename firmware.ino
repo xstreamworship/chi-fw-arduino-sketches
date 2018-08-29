@@ -66,7 +66,7 @@ const PROGMEM char AnalogFilterStr4[] = "Volume";
 const PROGMEM char AnalogFilterStr5[] = "JoyZ";
 const PROGMEM char AnalogFilterStr6[] = "JoyX";
 const PROGMEM char AnalogFilterStr7[] = "JoyY";
-const PROGMEM CFilter analogFilters[] =
+CFilter analogFilters[] =
 {
   //      name               thresh  origin ormrgn   min   mnmrgn max   mxmrgn  CC   use case
   CFilter(AnalogFilterStr0,   32,     0,      0,      0,     0,   4095,  0,     90,  E_AUC_SIMPLE_CC),
@@ -82,7 +82,7 @@ const PROGMEM CFilter analogFilters[] =
 // Logical switch scanner.
 const PROGMEM char footSwitchesStr0[] = "Damper";
 const PROGMEM char footSwitchesStr1[] = "Soft";
-const PROGMEM CSwitch footSwitches[] =
+CSwitch footSwitches[] =
 {
   CSwitch(footSwitchesStr0),
   CSwitch(footSwitchesStr1),
@@ -101,7 +101,7 @@ const PROGMEM char switchLedMatrixStr8[] = "P3";
 const PROGMEM char switchLedMatrixStr9[] = "Trem";
 const PROGMEM char switchLedMatrixStr10[] = "Ep2";
 const PROGMEM char switchLedMatrixStr11[] = "Harp";
-const PROGMEM CSwitch switchLedMatrix[] =
+CSwitch switchLedMatrix[] =
 {
   CSwitch(switchLedMatrixStr0),
   CSwitch(switchLedMatrixStr1),
@@ -117,16 +117,16 @@ const PROGMEM CSwitch switchLedMatrix[] =
   CSwitch(switchLedMatrixStr11),
 };
 const PROGMEM char joystickButtonStr[] = "JSButton";
-const PROGMEM CSwitch joystickButton(joystickButtonStr);
+CSwitch joystickButton(joystickButtonStr);
 const PROGMEM char rotarySwStr0[] = "RotSlow";
 const PROGMEM char rotarySwStr1[] = "RotFast";
-const PROGMEM CSwitch rotarySw[] =
+CSwitch rotarySw[] =
 {
   CSwitch(rotarySwStr0),
   CSwitch(rotarySwStr1),
 };
 const PROGMEM char midiCableDetectStr[] = "MIDICable";
-const PROGMEM CSwitch midiCableDetect(midiCableDetectStr);
+CSwitch midiCableDetect(midiCableDetectStr);
 
 // Logical MIDI keyboard scanning.
 const PROGMEM char NoteA1Str[] = "A1";
@@ -170,7 +170,7 @@ const PROGMEM char NoteBb4Str[] = "A#/Bb4";
 const PROGMEM char NoteB4Str[] = "B4";
 const PROGMEM char NoteC5Str[] = "C5";
 
-const PROGMEM CMidiKeySwitch keyboard[] =
+CMidiKeySwitch keyboard[] =
 {
   CMidiKeySwitch(NoteA1Str),
   CMidiKeySwitch(NoteBb1Str),
@@ -816,12 +816,6 @@ void complete(void)
   switch (i2cIsrState)
   {
     case ITS_LEDSW_T_OUT:
-      // Done sending reg T out.
-      //  - selecting LED / switch column.
-      //  - setting the LED outputs for the cross section of the rows.
-      // Next, read reg S, switch input values for the cross section of the rows.
-//      twi_initiate_transaction(REG_ST_I2C_ADDR, uint8_t *data_wr, uint8_t bytes_wr,
-//  uint8_t *data_rd, uint8_t bytes_rd, uint32_t *doneAtPtr = NULL);
       break;
     case ITS_LEDSW_S_IN:
       break;
@@ -972,14 +966,14 @@ void loop()
   // I2C write
   //uint32_t startTime = micros();
   RegQ.syncOut();
-  RegR.syncOut();
-  RegS.syncOut();
+  //RegR.syncOut();
+  //RegS.syncOut();
   RegT.syncOut();
   // I2C read
-  RegQ.syncIn();
+  //RegQ.syncIn();
   RegR.syncIn();
   RegS.syncIn();
-  RegT.syncIn();
+  //RegT.syncIn();
   //uint32_t endTime = micros();
 
   //uint32_t startTime = micros();
@@ -989,7 +983,7 @@ void loop()
   //uint32_t endTime = micros();
 
   // Read in from the AD7997 analog ports.
-#if 0
+#if 1
   AnalogA.sync(kbd_scan_column_index);
   //uint32_t startTime = micros();
   scan_analogs(kbd_scan_column_index, AnalogA.syncdAt());
