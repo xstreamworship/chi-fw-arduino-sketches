@@ -228,7 +228,7 @@ enum EUseCase
 };
 
 // Regular scanning of input switches.
-void scan_switches( void )
+void scan_misc_switches( void )
 {
   uint32_t timeS = RegS.syncdInAt();
 //  uint32_t timeT = RegT.syncdInAt();
@@ -270,7 +270,7 @@ enum EShiftStates
 };
 enum EShiftStates shiftState = E_SS_UNSHIFTED;
 
-void switch_led_sync_led_states_this_column( void )
+void switch_led_sync_led_states_selected_column( void )
 {
   const uint8_t mask = 0xe1;
   uint8_t val = (RegT.read() & mask);
@@ -287,7 +287,7 @@ void switch_led_sync_led_states_this_column( void )
   RegT.write(val); 
 }
 
-void switch_led_next_column( void )
+void switch_led_select_next_column( void )
 {
   uint8_t pattern[3] = { 0x60, 0xa0, 0xc0 };
   const uint8_t mask = 0x1f;
@@ -296,10 +296,9 @@ void switch_led_next_column( void )
   switch_led_scan_column_index = (switch_led_scan_column_index + 1) % 3;
   uint16_t val = (RegT.read() & mask) | pattern[switch_led_scan_column_index];
   RegT.write(val);
-  switch_led_sync_led_states_this_column();
 }
 
-void switch_led_scan_switches_this_column( void )
+void switch_led_scan_switches_selected_column( void )
 {
   uint32_t timeS = RegS.syncdInAt();
   // LS 7bits are the CC num, MSB is the use case selector between shift and shifted.
@@ -324,8 +323,9 @@ void switch_led_scan_switches_this_column( void )
 }
 
 static unsigned kbd_scan_column_index = 0;
+static unsigned analog_ch_index = 0;
 
-void kbd_scan_next_column_sequence( void )
+void kbd_select_next_column( void )
 {
   // Tried: 'static const PROGMEM' but it didn't work as expected.  Probably need an accessor function later.
   byte pattern[8] = { 0xfe, 0xfd, 0xfb, 0xf7, 0xef, 0xdf, 0xbf, 0x7f };
@@ -334,7 +334,7 @@ void kbd_scan_next_column_sequence( void )
   RegQ.write(pattern[kbd_scan_column_index]);
 }
 
-void kbd_scan_keys_this_column( void )
+void kbd_scan_keys_selected_column( void )
 {
   uint32_t timeR = RegR.syncdInAt();
   uint32_t timeS = RegS.syncdInAt();
@@ -359,9 +359,6 @@ void kbd_scan_keys_this_column( void )
     timeR, kbd_scan_column_index + 32,
     (RegR.read() & 0x40) == 0,
     (RegR.read() & 0x80) == 0);
-
-  // Advance to next column.
-  kbd_scan_column_index = (kbd_scan_column_index + 1) % 8;
 }
 
 // Callbacks / hook functions.
@@ -585,7 +582,6 @@ void switchChanged(bool state, uint8_t ccNum, uint8_t uCase)
   }
 }
 
-
 bool joystickShifted = false;
 void analogChanged(bool state, uint16_t val, uint8_t ccNum, uint8_t uCase)
 {
@@ -754,85 +750,6 @@ void handleProgCh(uint8_t pcVal, uint8_t channel)
   syncLedsToProgChange();
 }
 
-#if 0
-enum I2C_Thread_States
-{
-  ITS_IDLE = 0,
-  ITS_LEDSW_T_OUT,
-  ITS_LEDSW_S_IN,
-  ITS_KEYBD_Q_OUT,
-  ITS_KEYBD_R_IN,
-  ITS_KEYBD_S_IN,
-  ITS_ANALOG_IN,
-
-  ITS_NUM_STATES
-};
-
-enum I2C_Reg_States
-{
-  IRS_IDLE = 0,
-  IRS_READY,
-  IRS_ISR_BUSY,
-  IRS_ISR_DONE,
-
-  IRS_NUM_STATES
-};
-
-enum I2C_Misc_Parms
-{
-  LEDSW_NUM_COL = 3,
-  KEYBD_NUM_COL = 8,
-  ANALOG_NUM_CH = 8,
-
-  REG_QR_I2C_ADDR = 32,
-  REG_ST_I2C_ADDR = 33,
-  ANALOG_I2C_ADDR = 34,
-};
-
-struct RegDigIn
-{
-  uint32_t m_timeRead;
-  uint8_t m_valueRead;
-};
-
-struct RegDigRSIn
-{
-  struct RegDigIn R;
-  struct RegDigIn S;
-  enum I2C_Reg_States m_state;
-};
-
-struct RegDigRSIn keyboardSwitchInputs[KEYBD_NUM_COL] = { 0 };
-uint8_t keyboardSwitchCol = 0;
-struct RegDigIn ledSwitchInputs[LEDSW_NUM_COL] = { 0 };
-uint8_t ledSwitchCol = 0;
-enum I2C_Thread_States i2cIsrState = ITS_IDLE;
-
-
-
-// Handle I2C transactions
-void complete(void)
-{
-  switch (i2cIsrState)
-  {
-    case ITS_LEDSW_T_OUT:
-      break;
-    case ITS_LEDSW_S_IN:
-      break;
-    case ITS_KEYBD_Q_OUT:
-      break;
-    case ITS_KEYBD_R_IN:
-      break;
-    case ITS_KEYBD_S_IN:
-      break;
-    case ITS_ANALOG_IN:
-      break;
-    default:
-      break;
-  }
-}
-#endif
-
 // The setup() function runs once at startup.
 void setup()
 {
@@ -921,6 +838,11 @@ void update_cycle_time(uint32_t delta)
     cycleInd = 0;
 }
 
+bool start_of_key_scan_cycle(void)
+{
+  return kbd_scan_column_index == 0;
+}
+
 void loop()
 {
   unsigned long currentMicros = micros();
@@ -952,74 +874,64 @@ void loop()
       led++;
       led %= 12;
       //Serial.print(F("Profile Cycle Time: "));
-      //Serial.println(cycleTime / CYCLE_WIN_SZ);
+      // * 8 because it takes 8 cycles to scan the keyboard.
+      //Serial.println(cycleTime / CYCLE_WIN_SZ * 8);
     }
   }
-
-  //uint32_t startTime = micros();
-  kbd_scan_next_column_sequence();
-  switch_led_next_column();
-  switch_led_sync_led_states_this_column();
-  //uint32_t endTime = micros();
 
   // Synchronize with the hardware
   // I2C write
   //uint32_t startTime = micros();
+  kbd_select_next_column();
   RegQ.syncOut();
-  //RegR.syncOut();
-  //RegS.syncOut();
-  RegT.syncOut();
+  if (start_of_key_scan_cycle()) {
+    switch_led_select_next_column();
+    switch_led_sync_led_states_selected_column();
+    RegT.syncOut();
+  }
+  //uint32_t endTime = micros();
+
+  //uint32_t startTime = micros();
   // I2C read
-  //RegQ.syncIn();
   RegR.syncIn();
   RegS.syncIn();
-  //RegT.syncIn();
   //uint32_t endTime = micros();
 
   //uint32_t startTime = micros();
-  kbd_scan_keys_this_column();
-  switch_led_scan_switches_this_column();
-  scan_switches();
-  //uint32_t endTime = micros();
+  kbd_scan_keys_selected_column();
+  // Advance to next column.
+  kbd_scan_column_index = (kbd_scan_column_index + 1) % 8;
+  if (start_of_key_scan_cycle()) {
+    switch_led_scan_switches_selected_column();
+    scan_misc_switches();
+    //uint32_t endTime = micros();
 
-  // Read in from the AD7997 analog ports.
-#if 1
-  AnalogA.sync(kbd_scan_column_index);
-  //uint32_t startTime = micros();
-  scan_analogs(kbd_scan_column_index, AnalogA.syncdAt());
-  //uint32_t endTime = micros();
-#else
-  if (kbd_scan_column_index == 0) {
+    // Read in from the AD7997 analog ports.
+    AnalogA.sync(analog_ch_index);
     //uint32_t startTime = micros();
-    AnalogA.sync();
-    uint32_t endTime = AnalogA.syncdAt();
-    //update_cycle_time(endTime - startTime);
+    scan_analogs(analog_ch_index, AnalogA.syncdAt());
+    //uint32_t endTime = micros();
+    // Advance to next channel.
+    analog_ch_index = (analog_ch_index + 1) % 8;
+
     //uint32_t startTime = micros();
-    for (unsigned i = 0; i < 8; i++) {
-      scan_analogs(i, endTime);
+    if (rotaryBrakeStart) {
+      // Rotary brake mode timer active.
+      if ((micros() - rotaryBrakeStart) > 250000) {
+        // 250ms guard time before braking the rotary since the switch
+        // always passes through the centre position.
+        switchChanged(false, 2, E_UC_ROTARY_CC);
+      }
     }
-    //uint32_t end2Time = micros();
-    //update_cycle_time(end2Time - startTime);
-  }
-#endif
 
-  //uint32_t startTime = micros();
-  if (rotaryBrakeStart) {
-    // Rotary brake mode timer active.
-    if ((micros() - rotaryBrakeStart) > 250000) {
-      // 250ms guard time before braking the rotary since the switch
-      // always passes through the centre position.
-      switchChanged(false, 2, E_UC_ROTARY_CC);
+    if (analogFilters[5].atOrigin() && analogFilters[6].atOrigin() && analogFilters[7].atOrigin()) {
+      // We only allow the joystick switch to shift / unshift while joystick is positioned at origin.
+      joystickShifted = joystickButton.switchState();
     }
-  }
 
-  if (analogFilters[5].atOrigin() && analogFilters[6].atOrigin() && analogFilters[7].atOrigin()) {
-    // We only allow the joystick switch to shift / unshift while joystick is positioned at origin.
-    joystickShifted = joystickButton.switchState();
+    // Check for and handle receive MIDI messages.
+    midiJacks.receiveScan();
   }
-
-  // Check for and handle receive MIDI messages.
-  midiJacks.receiveScan();
   //uint32_t endTime = micros();
 
   //update_cycle_time(endTime - startTime);

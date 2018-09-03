@@ -40,7 +40,7 @@ static volatile uint8_t slave_transfer_type;
 static volatile uint8_t *slave_default_wr_ptr;
 static volatile uint8_t slave_default_wr_bytes;
 static volatile uint8_t slave_default_msg;
-static void (*slave_transfer_request_callback)(uint8_t xtype, uint8_t **ptrptr, uint8_t *szptr);
+static void (*slave_transfer_request_callback)(uint8_t xtype, volatile uint8_t **ptrptr, volatile uint8_t *szptr);
 static void (*slave_transfer_complete_callback)(uint8_t xtype, uint8_t count);
 static volatile uint8_t bit_bucket;
 static volatile uint32_t *done_at_time;
@@ -156,7 +156,7 @@ void twi_master_setup(uint8_t sla_attempts, uint8_t arb_attempts)
 void twi_slave_setup(uint8_t slave_address, uint8_t general_call,
 	uint8_t *default_message, uint8_t default_message_length,
 	void (*transfer_request_callback)
-		(uint8_t xtype, uint8_t **ptrptr, uint8_t *szptr),
+		(uint8_t xtype, volatile uint8_t **ptrptr, volatile uint8_t *szptr),
 	void (*transfer_complete_callback)(uint8_t xtype, uint8_t count)
 	)
 {
@@ -548,7 +548,7 @@ ISR(TWI_vect)
 		}
 
 		// Clear the source pointer and size now that it has been
-		// transfered into teh working variables
+		// transfered into the working variables
 		slave_data_wr_ptr = NULL;
 		slave_wr_bytes = 0;
 
