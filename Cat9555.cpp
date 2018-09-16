@@ -12,7 +12,6 @@
 #include "twi_if.h"
 
 CCat9555::CCat9555(const uint8_t i2cAddr, const uint8_t portNum, const uint8_t portConfig) :
-  m_readAt(0),
   m_i2cAddr(i2cAddr),
   m_portNum(portNum),
   m_portConfig(portConfig)
@@ -50,7 +49,7 @@ void CCat9555::startOut(void)
 void CCat9555::startIn(void)
 {
   m_in.cmd = ECREG_INPUT + m_portNum;
-  twi_initiate_transaction(m_i2cAddr, &m_in.cmd, sizeof(m_in.cmd), &m_in.port, sizeof(m_in.port), &m_readAt);
+  twi_initiate_transaction(m_i2cAddr, &m_in.cmd, sizeof(m_in.cmd), &m_in.port, sizeof(m_in.port));
 }
 
 void CCat9555::syncOut(void)
@@ -64,13 +63,4 @@ void CCat9555::syncIn(void)
   startIn();
   twi_wait_until_master_ready();
 }
-
-#if 0
-STWI_TRANSACTION(yaddaOut, sizeof(SCat9555Buf)) (33, sizeof(SCat9555Buf::cmd), sizeof(SCat9555Buf::port));
-
-void blah(void)
-{
-  TWI_INITIATE_TRANSACTION(yaddaOut);
-}
-#endif
 

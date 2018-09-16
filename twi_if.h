@@ -18,26 +18,22 @@
 
 #define TWI_ERR_API_PARM_INVALID		(-1)
 
-
 #define STT_APP   0
 #define STT_READY 1
 #define STT_BUSY  2
 struct STwiTransaction
 {
-  uint32_t m_doneAt;
   uint8_t m_flag;
   uint8_t m_i2cAddress;
   uint8_t m_dataWrBytes;
   uint8_t m_dataRdBytes;
   uint8_t m_dataBuf[0];
   inline STwiTransaction(uint8_t i2cAddress, uint8_t dataWrBytes, uint8_t dataRdBytes) :
-    m_doneAt(0),
     m_flag(STT_APP),
     m_i2cAddress(i2cAddress),
     m_dataWrBytes(dataWrBytes),
     m_dataRdBytes(dataRdBytes)
     { }
-
 };
 
 #define STWI_TRANSACTION(nm,bsz) \
@@ -67,7 +63,7 @@ void twi_slave_setup(uint8_t slave_address, uint8_t general_call,
 	void (*transfer_complete_callback)(uint8_t xtype, uint8_t count)
 	);
 int8_t twi_initiate_transaction(uint8_t address, uint8_t *data_wr, uint8_t bytes_wr,
-	uint8_t *data_rd, uint8_t bytes_rd, uint32_t *doneAtPtr = NULL);
+	uint8_t *data_rd, uint8_t bytes_rd);
 int8_t twi_initiate_write(uint8_t address, uint8_t *data, uint8_t bytes);
 int8_t twi_initiate_read(uint8_t address, uint8_t *data, uint8_t bytes);
 boolean twi_busy(void);
@@ -77,7 +73,7 @@ boolean twi_response(void);
 inline int8_t twi_initiate_transaction(struct STwiTransaction &tr)
 {
   return twi_initiate_transaction(tr.m_i2cAddress, tr.m_dataBuf, tr.m_dataWrBytes,
-    tr.m_dataBuf + tr.m_dataWrBytes, tr.m_dataRdBytes, &(tr.m_doneAt));
+    tr.m_dataBuf + tr.m_dataWrBytes, tr.m_dataRdBytes);
 }
 #define TWI_INITIATE_TRANSACTION(uttr) \
   twi_initiate_transaction(uttr.m)

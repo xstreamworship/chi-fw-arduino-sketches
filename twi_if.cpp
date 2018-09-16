@@ -43,7 +43,6 @@ static volatile uint8_t slave_default_msg;
 static void (*slave_transfer_request_callback)(uint8_t xtype, volatile uint8_t **ptrptr, volatile uint8_t *szptr);
 static void (*slave_transfer_complete_callback)(uint8_t xtype, uint8_t count);
 static volatile uint8_t bit_bucket;
-static volatile uint32_t *done_at_time;
 
 #ifndef cbi
 #define cbi(sfr, bit) (_SFR_BYTE(sfr) &= ~_BV(bit))
@@ -194,12 +193,9 @@ void twi_slave_setup(uint8_t slave_address, uint8_t general_call,
 // Read bytes from a TWI peripheral
 /////////////////////////////////////////////////////////////////////
 int8_t twi_initiate_transaction(uint8_t address, uint8_t *data_wr,
-	uint8_t bytes_wr, uint8_t *data_rd, uint8_t bytes_rd,
-	uint32_t *doneAtPtr)
+	uint8_t bytes_wr, uint8_t *data_rd, uint8_t bytes_rd)
 {
 	noInterrupts(); // protect atomic operation
-
-  done_at_time = doneAtPtr;
 
 	// Bus is busy so wait and then try again
 	while (master_busy)
@@ -238,8 +234,6 @@ int8_t twi_initiate_transaction(uint8_t address, uint8_t *data_wr,
 		//  - request nothing send or receive
 		//  - trying to read during a general call
 		master_busy = false;
-    if (done_at_time)
-      *done_at_time = micros();
 		interrupts();
 		return TWI_ERR_API_PARM_INVALID;
 	}
@@ -307,8 +301,6 @@ void twi_wait_until_master_ready(void)
 	while (master_busy)
 	{
 	}
-//  if (done_at_time)
-//    *done_at_time = micros();
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -369,8 +361,6 @@ ISR(TWI_vect)
 			TWCR |= (1 << TWINT) | (1 << TWSTO) | (1 << TWEA);
 			// Bus no longer busy
 			master_busy = false;
-      if (done_at_time)
-        *done_at_time = micros();
 		}
 		else
 		{
@@ -409,8 +399,6 @@ ISR(TWI_vect)
 			TWCR |= (1 << TWSTO) | (1 << TWINT) | (1 << TWEA);
 			// Bus no longer busy
 			master_busy = false;
-      if (done_at_time)
-        *done_at_time = micros();
 			// Response has been received
 			master_response_ok = true;
 		}
@@ -447,8 +435,6 @@ ISR(TWI_vect)
 		TWCR |= (1 << TWINT) | (1 << TWSTO) | (1 << TWEA);
 		// Bus no longer busy
 		master_busy = false;
-    if (done_at_time)
-      *done_at_time = micros();
 		break;
 
 	case TW_MR_SLA_ACK:		// Slave acknowledged address
@@ -486,8 +472,6 @@ ISR(TWI_vect)
 		TWCR |= (1 << TWSTO) | (1 << TWINT) | (1 << TWEA);
 		// Bus no longer busy
 		master_busy = false;
-    if (done_at_time)
-      *done_at_time = micros();
 		// Response has been received
 		master_response_ok = true;
 		break;
@@ -507,8 +491,6 @@ ISR(TWI_vect)
 			TWCR |= (1 << TWSTO) | (1 << TWINT) | (1 << TWEA);
 			// Bus no longer busy
 			master_busy = false;
-      if (done_at_time)
-        *done_at_time = micros();
 		}
 		else
 		{
@@ -681,8 +663,6 @@ ISR(TWI_vect)
 			// masters erroneously have the same address (or competing roles).
 			// Bus no longer busy
 			master_busy = false;
-      if (done_at_time)
-        *done_at_time = micros();
 		}
 
 		// Go back to slave monitoring mode
@@ -697,8 +677,6 @@ ISR(TWI_vect)
 			TWCR |= (1 << TWINT) | (1 << TWSTO);
 			// Bus no longer busy
 			master_busy = false;
-      if (done_at_time)
-        *done_at_time = micros();
 			master_blocked = false;
 		}
 		bus_error = TWI_status;

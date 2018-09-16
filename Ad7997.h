@@ -11,6 +11,7 @@
 #define __AD7997_H
 
 #include "Arduino.h"
+#include "twi_if.h"
 
 class CAd7997
 {
@@ -29,7 +30,6 @@ class CAd7997
       E_READ_CMD = 0x80,
       E_READ_ALL_CMD = 0x70,
     };
-    uint32_t m_readAt;
     const uint8_t m_i2cAddr;
     uint8_t m_inBytes[E_NUM_PORTS * 2];
     unsigned m_errCnt;
@@ -38,9 +38,11 @@ class CAd7997
     CAd7997(const uint8_t i2cAddr);
     ~CAd7997(void);
     void begin(void);
-    uint32_t sync(void);
-    uint32_t sync(uint8_t index);
-    inline uint32_t syncdAt(void) { return m_readAt; }
+    void start(void);
+    void start(uint8_t index);
+    void sync(void);
+    void sync(uint8_t index);
+    bool isBusy(void) { return twi_busy(); }
     uint16_t read(uint8_t index) {
       if (((m_inBytes[2 * index] >> 4) & 0x07) != index) {
         // Error - TODO - FIXME - have error handling.

@@ -33,7 +33,6 @@ class CCat9555
     {
       E_NUM_PORTS = 2,
     };
-    uint32_t m_readAt;
     SCat9555Buf m_in;
     SCat9555Buf m_out;
     const uint8_t m_portConfig;
@@ -49,7 +48,6 @@ class CCat9555
     void syncOut(void);
     void syncIn(void);
     bool isBusy(void) { return twi_busy(); }
-    inline uint32_t syncdInAt(void) { return m_readAt; }
     inline void write(uint8_t outValue) { m_out.port = outValue; }
     inline uint16_t read(void) { return (m_in.port & m_portConfig) | (m_out.port & ~ m_portConfig); }
 };
