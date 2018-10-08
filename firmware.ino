@@ -75,7 +75,7 @@
 
 #include "MidiPort.h"
 
-#define FORCE_DEBUG 1
+#define FORCE_DEBUG CHI_MAIN_MCU_FW
 
 #define __READ_BIT(p,b) (p & (1 << b))
 #define __WRITE_BIT(p ,b, e) \
@@ -1062,7 +1062,7 @@ void setup()
   digitalWrite(53, HIGH);
 #endif
 
-#ifdef FORCE_DEBUG
+#if FORCE_DEBUG
   Serial.begin(230400);
   Serial.println(F("Chi - debug"));
 #endif
@@ -1079,16 +1079,16 @@ void setup()
 
   // Probe and initialize the AD7997 analog ports.
   AnalogA.begin();
-
-  // Read in so we can check the mode switch at startup.
-#ifndef FORCE_DEBUG
-//FIXME - remap I/O for the force debug switch
-#if 0
-  RegT.syncIn();
-  debug_mode = ((RegT.read() & 0x01) != 0);
 #endif
-#else
+
+  // Read in so we can check the DIP switches at startup.
+#if FORCE_DEBUG
   debug_mode = true;
+#else
+  // DIP SW3 selects debug mode for Aux MCU.
+#if CHI_AUX_MCU_FW && CHI_TWI_IF
+  RegT.syncIn();
+  debug_mode = ((RegT.read() & 0x01) == 0);
 #endif
 #endif
 
@@ -1101,7 +1101,7 @@ void setup()
 #endif
   } else {
     // Initialize serial UART for debug output.
-#ifndef FORCE_DEBUG
+#if ! FORCE_DEBUG
     Serial.begin(230400);
 #endif
     Serial.print(F("Chi - "));
