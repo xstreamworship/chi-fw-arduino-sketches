@@ -147,10 +147,9 @@ void CMidiKeySwitch::noteOn(uint8_t note, unsigned long ttime)
     else
       vel = 127 - ttime_scaled;
   }
-  if (!debug_mode) {
-    // Using serial for MIDI
-    ::noteOn(note, vel, s_midi_ch);
-  } else {
+
+  ::noteOn(note, vel, s_midi_ch);
+  if (debug_mode) {
     char mbuffer[10];
     strncpy_P(mbuffer, m_noteName, sizeof(mbuffer) - 1);
     Serial.print(mbuffer);
@@ -166,10 +165,8 @@ extern unsigned long cycleTime;
 void CMidiKeySwitch::noteOff(uint8_t note, unsigned long ttime)
 {
   uint8_t vel = 0;
-  if (!debug_mode) {
-    // Using serial for MIDI
-    ::noteOff(note, vel, s_midi_ch);
-  } else {
+  ::noteOff(note, vel, s_midi_ch);
+  if (debug_mode) {
     char mbuffer[10];
     strncpy_P(mbuffer, m_noteName, sizeof(mbuffer) - 1);
     Serial.print(mbuffer);

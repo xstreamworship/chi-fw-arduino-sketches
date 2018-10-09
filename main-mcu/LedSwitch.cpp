@@ -9,7 +9,7 @@
 /////////////////////////////////////////////////////////////////////
 #include "Arduino.h"
 
-#include "Switch.h"
+#include "LedSwitch.h"
 
 extern bool debug_mode;
 void switchChanged(bool state, uint8_t ccNum, uint8_t uCase);
@@ -89,10 +89,8 @@ void CSwitch::scan(uint32_t sTime, bool state, uint8_t ccNum, uint8_t uCase)
 
 void CSwitch::switchOn(uint8_t ccNum, uint8_t uCase)
 {
-  if (!debug_mode) {
-    // Using serial for MIDI.
-    switchChanged(true, ccNum, uCase);
-  } else {
+  switchChanged(true, ccNum, uCase);
+  if (debug_mode) {
     char mbuffer[12];
     Serial.print(F("Switch: "));
     strncpy_P(mbuffer, m_switchName, sizeof(mbuffer) - 1);
@@ -103,10 +101,8 @@ void CSwitch::switchOn(uint8_t ccNum, uint8_t uCase)
 
 void CSwitch::switchOff(uint8_t ccNum, uint8_t uCase)
 {
-  if (!debug_mode) {
-    // Using serial for MIDI.
-    switchChanged(false, ccNum, uCase);
-  } else {
+  switchChanged(false, ccNum, uCase);
+  if (debug_mode) {
     char mbuffer[12];
     Serial.print(F("Switch: "));
     strncpy_P(mbuffer, m_switchName, sizeof(mbuffer) - 1);
