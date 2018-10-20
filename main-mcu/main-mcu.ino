@@ -363,11 +363,13 @@ void setLed(bool val)
 void noteOn(uint8_t note, uint8_t velocity, uint8_t channel)
 {
   midiJacks.noteOn(note, velocity, channel);
+  midiUSB.noteOn(note, velocity, channel);
 }
 
 void noteOff(uint8_t note, uint8_t velocity, uint8_t channel)
 {
   midiJacks.noteOff(note, velocity, channel);
+  midiUSB.noteOff(note, velocity, channel);
 }
 
 //                        Trans PC 1  2  3   4  5  6  7   8  Ch Trem
@@ -394,6 +396,7 @@ void switchChanged(bool state, uint8_t ccNum, uint8_t uCase)
   {
     case E_UC_SIMPLE_CC: // Simple switch mapped to CC use case
       midiJacks.ctrlCh(ccNum, ccVal, channel);
+      midiUSB.ctrlCh(ccNum, ccVal, channel);
       break;
     case E_UC_SHIFT:
       if (state) break; // Only process the switch release.
@@ -442,6 +445,7 @@ void switchChanged(bool state, uint8_t ccNum, uint8_t uCase)
         case E_SS_UNSHIFTED:
           // Unshifted, so this switch sends out a CC
           midiJacks.ctrlCh(ccNum, ccVal, channel);
+          midiUSB.ctrlCh(ccNum, ccVal, channel);
           break;
         case E_SS_PROGCH:
 #if 0
@@ -475,6 +479,7 @@ void switchChanged(bool state, uint8_t ccNum, uint8_t uCase)
             // Only send out a PC message if the value has changed.
             currentPC = newPC;
             midiJacks.progCh(currentPC, channel);
+            midiUSB.progCh(currentPC, channel);
           }
           syncLedsToProgChange();
           break;
@@ -689,7 +694,6 @@ void setup()
   // Setup serial ports used for MIDI (Serial port 0 [USB] already setup earlier).
   // Serial1 - MIDI-In / MIDI-Out connectors.
   midiJacks.begin(&setLed, &handleCtrlCh, &handleProgCh);
-//Serial1.begin(31250);
   // Serial2 - MIDI-In from Aux MCU [B2B] / MIDI-Thru/Out2 connector.
   if (debug_mode_aux) {
     // When Aux MCU debug mode set, we lose the MIDI-Thru/Out2
@@ -813,7 +817,9 @@ if (currentMicros >= nextSecondsMicros) {
     unsigned int polls = 100;
     while ((Serial2.available() > 0) && --polls) {
       uint8_t c = Serial2.read();
-      Serial.write(c);
+      if (debug_mode) {
+        Serial.write(c);
+      }
       if (c == '\n')
         break;
     }
