@@ -79,9 +79,9 @@ MCU_DFU = $(MCU)
 # Specify the Arduino VID
 ARDUINO_VID = 0x2341
 # Uno PID:
-ARDUINO_MODEL_PID = 0x0001
+#ARDUINO_MODEL_PID = 0x0001
 # Mega 2560 PID:
-#ARDUINO_MODEL_PID = 0x0010
+ARDUINO_MODEL_PID = 0x0010
 
 # use PID/VID for LUFA USB Serial Demo Application
 #  ATMEL VID
@@ -139,7 +139,9 @@ OBJDIR = .
 
 
 # Path to the LUFA library  ( to LUFA-100807 )
-LUFA_PATH = ../../LUFA-100807
+LUFA_ARCHIVE = LUFA-$(LUFA_VERSION).zip
+LUFA_VERSION = 100807
+LUFA_PATH = ./lufa-$(LUFA_VERSION)
 
 
 # LUFA library compile-time options
@@ -387,7 +389,8 @@ LDFLAGS += $(PRINTF_LIB) $(SCANF_LIB) $(MATH_LIB)
 # to get a full listing.
 #
 #AVRDUDE_PROGRAMMER = avrispmkii
-AVRDUDE_PROGRAMMER = usbtiny
+#AVRDUDE_PROGRAMMER = usbtiny
+AVRDUDE_PROGRAMMER = usbasp
 
 # com1 = serial port. Use lpt1 to connect to parallel port.
 AVRDUDE_PORT = usb
@@ -528,7 +531,9 @@ asm: $(TARGET).s
 LIBNAME=lib$(TARGET).a
 lib: $(LIBNAME)
 
-
+$(LUFA_PATH)/LUFA/makefile:
+	@unzip $(LUFA_ARCHIVE)
+	@mv LUFA\ $(LUFA_VERSION) lufa-$(LUFA_VERSION)
 
 # Eye candy.
 # AVR Studio 3.x does not check make's exit code but relies on
@@ -751,6 +756,7 @@ $(OBJDIR)/%.o : %.S
 
 # Target: clean project.
 clean: begin clean_list clean_binary end
+	@rm -rf lufa-$(LUFA_VERSION)
 
 clean_binary:
 	$(REMOVE) $(TARGET).hex

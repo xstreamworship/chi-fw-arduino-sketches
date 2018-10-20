@@ -99,19 +99,43 @@
 	/* Type Defines for MIDI */
 		typedef struct
 		{
+			USB_Descriptor_Header_t   Header; /**< Regular descriptor header containing the descriptor's type and length */
+			uint8_t                   Subtype; /**< Sub type value used to distinguish between audio class specific descriptors */
+
+			uint8_t                   TotalEmbeddedJacks; /**< Total number of jacks inside this endpoint */
+			uint8_t                   AssociatedJackID[2]; /**< IDs of each jack inside the endpoint */
+		} USB_MIDI_DualJack_Endpoint_t;
+
+		typedef struct
+		{
+			USB_Descriptor_Header_t   Header; /**< Regular descriptor header containing the descriptor's type and length */
+			uint8_t                   Subtype; /**< Sub type value used to distinguish between audio class specific descriptors */
+
+			uint8_t                   TotalEmbeddedJacks; /**< Total number of jacks inside this endpoint */
+			uint8_t                   AssociatedJackID[3]; /**< IDs of each jack inside the endpoint */
+		} USB_MIDI_TripleJack_Endpoint_t;
+
+		typedef struct
+		{
 			USB_Descriptor_Configuration_Header_t Config;
 			USB_Descriptor_Interface_t            Audio_ControlInterface;
 			USB_Audio_Interface_AC_t              Audio_ControlInterface_SPC;
 			USB_Descriptor_Interface_t            Audio_StreamInterface;
 			USB_MIDI_AudioInterface_AS_t          Audio_StreamInterface_SPC;
-			USB_MIDI_In_Jack_t                    MIDI_In_Jack_Emb;
-			USB_MIDI_In_Jack_t                    MIDI_In_Jack_Ext;
-			USB_MIDI_Out_Jack_t                   MIDI_Out_Jack_Emb;
-			USB_MIDI_Out_Jack_t                   MIDI_Out_Jack_Ext;
+			USB_MIDI_In_Jack_t                    MIDI_In_Jack_Emb_to_MIDI_Out;
+			USB_MIDI_In_Jack_t                    MIDI_In_Jack_Emb_to_MIDI_Thru;
+			USB_MIDI_In_Jack_t                    MIDI_In_Jack_Emb_to_Internal;
+			USB_MIDI_In_Jack_t                    MIDI_In_Jack_Ext_src_MIDI_In;
+			USB_MIDI_In_Jack_t                    MIDI_In_Jack_Ext_src_Internal;
+			USB_MIDI_Out_Jack_t                   MIDI_Out_Jack_Emb_from_MIDI_In;
+			USB_MIDI_Out_Jack_t                   MIDI_Out_Jack_Emb_from_Internal;
+			USB_MIDI_Out_Jack_t                   MIDI_Out_Jack_Ext_dst_MIDI_Out;
+			USB_MIDI_Out_Jack_t                   MIDI_Out_Jack_Ext_dst_MIDI_Thru;
+			USB_MIDI_Out_Jack_t                   MIDI_Out_Jack_Ext_dst_Internal;
 			USB_Audio_StreamEndpoint_Std_t        MIDI_In_Jack_Endpoint;
-			USB_MIDI_Jack_Endpoint_t              MIDI_In_Jack_Endpoint_SPC;
+			USB_MIDI_TripleJack_Endpoint_t        MIDI_In_Jack_Endpoint_SPC;
 			USB_Audio_StreamEndpoint_Std_t        MIDI_Out_Jack_Endpoint;
-			USB_MIDI_Jack_Endpoint_t              MIDI_Out_Jack_Endpoint_SPC;
+			USB_MIDI_DualJack_Endpoint_t          MIDI_Out_Jack_Endpoint_SPC;
 		} USB_Descriptor_ConfigurationMIDI_t;
 		
 	/* Function Prototypes: */
