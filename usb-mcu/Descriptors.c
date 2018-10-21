@@ -301,9 +301,9 @@ const USB_Descriptor_ConfigurationMIDI_t PROGMEM ConfigurationDescriptorMIDI =
 			.Subtype                  = DSUBTYPE_InputJack,
 
 			.JackType                 = MIDI_JACKTYPE_EMBEDDED,
-			.JackID                   = 0x01,
+			.JackID                   = 0x02,
 
-			.JackStrIndex             = NO_DESCRIPTOR
+			.JackStrIndex             = 0x04
 		},
 
 	.MIDI_In_Jack_Emb_to_MIDI_Thru =
@@ -312,9 +312,9 @@ const USB_Descriptor_ConfigurationMIDI_t PROGMEM ConfigurationDescriptorMIDI =
 			.Subtype                  = DSUBTYPE_InputJack,
 
 			.JackType                 = MIDI_JACKTYPE_EMBEDDED,
-			.JackID                   = 0x02,
+			.JackID                   = 0x03,
 
-			.JackStrIndex             = NO_DESCRIPTOR
+			.JackStrIndex             = 0x05
 		},
 
 	.MIDI_In_Jack_Emb_to_Internal =
@@ -323,9 +323,9 @@ const USB_Descriptor_ConfigurationMIDI_t PROGMEM ConfigurationDescriptorMIDI =
 			.Subtype                  = DSUBTYPE_InputJack,
 
 			.JackType                 = MIDI_JACKTYPE_EMBEDDED,
-			.JackID                   = 0x03,
+			.JackID                   = 0x01,
 
-			.JackStrIndex             = NO_DESCRIPTOR
+			.JackStrIndex             = 0x07
 		},
 
 	.MIDI_In_Jack_Ext_src_MIDI_In =
@@ -359,7 +359,7 @@ const USB_Descriptor_ConfigurationMIDI_t PROGMEM ConfigurationDescriptorMIDI =
 			.JackID                   = 0x06,
 
 			.NumberOfPins             = 1,
-			.SourceJackID             = {0x01},
+			.SourceJackID             = {0x02},
 			.SourcePinID              = {0x01},
 
 			.JackStrIndex             = 0x04
@@ -374,7 +374,7 @@ const USB_Descriptor_ConfigurationMIDI_t PROGMEM ConfigurationDescriptorMIDI =
 			.JackID                   = 0x07,
 
 			.NumberOfPins             = 1,
-			.SourceJackID             = {0x02},
+			.SourceJackID             = {0x03},
 			.SourcePinID              = {0x01},
 
 			.JackStrIndex             = 0x05
@@ -389,7 +389,7 @@ const USB_Descriptor_ConfigurationMIDI_t PROGMEM ConfigurationDescriptorMIDI =
 			.JackID                   = 0x08,
 
 			.NumberOfPins             = 1,
-			.SourceJackID             = {0x03},
+			.SourceJackID             = {0x01},
 			.SourcePinID              = {0x01},
 
 			.JackStrIndex             = 0x07
@@ -407,7 +407,7 @@ const USB_Descriptor_ConfigurationMIDI_t PROGMEM ConfigurationDescriptorMIDI =
 			.SourceJackID             = {0x04},
 			.SourcePinID              = {0x01},
 
-			.JackStrIndex             = NO_DESCRIPTOR
+			.JackStrIndex             = 0x03
 		},
 
 	.MIDI_Out_Jack_Emb_from_Internal =
@@ -422,7 +422,7 @@ const USB_Descriptor_ConfigurationMIDI_t PROGMEM ConfigurationDescriptorMIDI =
 			.SourceJackID             = {0x05},
 			.SourcePinID              = {0x01},
 
-			.JackStrIndex             = NO_DESCRIPTOR
+			.JackStrIndex             = 0x06
 		},
 
 	.MIDI_In_Jack_Endpoint =
@@ -472,7 +472,7 @@ const USB_Descriptor_ConfigurationMIDI_t PROGMEM ConfigurationDescriptorMIDI =
 			.Subtype                  = DSUBTYPE_General,
 
 			.TotalEmbeddedJacks       = 0x02,
-			.AssociatedJackID         = {0x09, 0x0a}
+			.AssociatedJackID         = {0x0a, 0x09}
 		}
 };
 

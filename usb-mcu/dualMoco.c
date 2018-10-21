@@ -111,11 +111,24 @@ USB_ClassInfo_MIDI_Device_t Keyboard_MIDI_Interface =  {
 };
 
 void parseUSBMidiMessage(uchar *data, uchar len) {
-  uchar cin = (*data) & 0x0f;	/* ignore cable no */
+  static uchar cable = 0;
+  uchar in_cable = (*data) >> 4;
+  uchar cin = (*data) & 0x0f;	/* code index number */
   uchar i;
+
+  if (in_cable != cable) {
+    /* The cable has changed, so issue an escape sequence. */
+    tx_buf[uwptr++] = 0xfd; /* Escape. */
+    tx_buf[uwptr++] = 0x00 + in_cable; /* Change cable ID (USB to serial direction). */
+    cable = in_cable;
+  }
 
   if (cin > 1) {		/* ignore cin == 0 and cin == 1 */
     for (i = 1 ; i < 4 ; i++) {
+      if (*(data + i) == 0xfd) {
+        /* This means that hereto undefined MIDI 0xfd is actually in use. */
+        tx_buf[uwptr++] = 0xfd; /* Escape it. */
+      }
       tx_buf[uwptr++] = *(data + i); /* copy to buffer */
       uwptr &= TX_MASK;
       if (i == 1) {
@@ -139,8 +152,10 @@ void parseUSBMidiMessage(uchar *data, uchar len) {
 }
 
 uchar parseSerialMidiMessage(uchar RxByte) {
+  static uchar cable = 0;
   static uchar PC = 0;
   static uchar SysEx = FALSE;
+  static uchar EscapeSeq = FALSE;
   static uchar sysExCnt = 0;
   static uchar stateTransTable[] = {
     0, 				/* 0 dummy */
@@ -161,25 +176,49 @@ uchar parseSerialMidiMessage(uchar RxByte) {
     14 | 0x80			/* 15->14 */
   };
 
-  if(SysEx){  /* MIDI System Message */
+  if (EscapeSeq){		/* Realtime multi-byte escape sequence */
+    if (RxByte == 0xfd){	/* This means that hereto undefined MIDI 0xfd is actually in use. */
+      /* Treat as single byte realtime MIDI message. */
+      utx_buf[0] = 0x0f + (cable << 4);
+      utx_buf[1] = RxByte;
+      utx_buf[2] = 0;
+      utx_buf[3] = 0;
+      EscapeSeq = FALSE;
+      return TRUE;
+    }
+    if ((RxByte & 0xf0) == 0x00) {
+      /* Change cable number (serial to USB direction). */
+      cable = RxByte & 0x0f;
+      EscapeSeq = FALSE;
+      return FALSE;
+    }
+    /* Otherwise unsupported escape sequence, ignore it. */
+    /* Note: Backwards compatibility is not assured if the escape sequence exceeds one byte. */
+    EscapeSeq = FALSE;
+    return FALSE;
+  }
+  if(SysEx){  		/* MIDI System Message */
     if(RxByte == 0xf7){		/* MIDI_EndSysEx */
       utx_buf[sysExCnt++] = RxByte;
-      utx_buf[0] = sysExCnt + 3; /* 0x05(single byte), 0x06(two bytes), or 0x07(three bytes) */
+      utx_buf[0] = ((sysExCnt + 3) & 0x0f) + (cable << 4); /* 0x05(single byte), 0x06(two bytes), or 0x07(three bytes) */
       SysEx = FALSE;
       PC = 0;
       return TRUE;		/* send sysEx */
     } else {
       utx_buf[sysExCnt++] = RxByte;
       if (sysExCnt == 4) {	/* buffer full */
-	utx_buf[0] = 0x04;	/* sysEx start */
+	utx_buf[0] = 0x04 + (cable << 4);	/* sysEx start */
 	sysExCnt = 1;
 	return TRUE;		/* send sysEx */
       }
     }
     return FALSE;
   }
-  if (RxByte >= 0xf8){		/* Single Byte Message */
-    utx_buf[0] = 0x0f;
+  if (RxByte == 0xfd){		/* Realtime multi-byte escape sequence */
+    EscapeSeq = TRUE;
+    return FALSE;
+  } else if (RxByte >= 0xf8){	/* Single Byte Message */
+    utx_buf[0] = 0x0f + (cable << 4);
     utx_buf[1] = RxByte;
     utx_buf[2] = 0;
     utx_buf[3] = 0;
@@ -209,6 +248,7 @@ uchar parseSerialMidiMessage(uchar RxByte) {
     PC = tt & 0x0f;
     if ((tt & 0x80) != 0) {
       memcpy(utx_buf, rx_buf, 4);
+      utx_buf[0] = (utx_buf[0] & 0x0f) + (cable << 4);
       return TRUE;
     }
   }
