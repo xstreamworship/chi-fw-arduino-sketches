@@ -652,8 +652,8 @@ void setup()
   debug_mode_aux = (digitalRead(dipSwPin[DIP_SW_AUX_MCU_DEBUG]) == 0);
 
   if (!debug_mode) {
-    // Use USB serial for MIDI
-    midiUSB.begin(&setLed, &handleCtrlCh, &handleProgCh);
+    // Use USB serial for MIDI (and at 1.25Mb/s)
+    midiUSB.begin(&setLed, &handleCtrlCh, &handleProgCh, 1250000);
   } else {
     // Initialize serial UART for debug output.
 #if ! FORCE_DEBUG

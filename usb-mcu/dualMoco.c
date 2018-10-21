@@ -402,13 +402,13 @@ void SetupHardware(void) {
     Serial_Init(9600, false);
   } else {		/* Moco mode */
     mocoMode = 1;
-    if ((PINB & 0x08) == 0) { /* high speed mode */
+    //if ((PINB & 0x08) == 0) { /* high speed mode */
       highSpeed = 1;
-      // UBRR1L = 1;		/* 500K at 16MHz clock */
+      //UBRR1L = 1;		/* 500K at 16MHz clock */
       UBRR1L = 0;		/* 1M at 16MHz clock */
-    } else {
-      UBRR1L = 31;	/* 31250Hz at 16MHz clock */
-    }
+    //} else {
+    //  UBRR1L = 31;	/* 31250Hz at 16MHz clock */
+    //}
     UCSR1B = (1<<RXEN1) | (1<<TXEN1);
     PORTB = 0x0E;	       /* PORTB1 = HIGH */
   }

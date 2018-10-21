@@ -21,6 +21,7 @@ class CMidiPort
     uint8_t m_currentStatus;
     SerialPort& m_serial;
     bool m_running;
+    bool m_runningStatus;
     void (* m_cbSetLed) (bool);
     void (* m_handleCtrlCh) (uint8_t, uint8_t, uint8_t);
     void (* m_handleProgCh) (uint8_t, uint8_t);
@@ -76,13 +77,15 @@ class CMidiPort
       m_currentStatus(0),
       m_rxRunningStatus(255),
       m_rxCCNum(255),
+      m_runningStatus(false),
       m_running(false) { }
     inline ~CMidiPort(void) { }
     inline void begin(void (* cbSetLed) (bool),
       void (* cbCtrlCh) (uint8_t, uint8_t, uint8_t) = 0,
-      void (* cbProgCh) (uint8_t, uint8_t) = 0)
+      void (* cbProgCh) (uint8_t, uint8_t) = 0,
+      uint32_t rate = 31250)
     {
-      m_serial.begin(31250);
+      m_serial.begin(rate);
       m_running = true;
       m_cbSetLed = cbSetLed;
       m_handleCtrlCh = cbCtrlCh;
@@ -100,7 +103,7 @@ class CMidiPort
         data1 &= 0x7f;
         data2 &= 0x7f;
         uint8_t msgStatus = msgType | channel;
-        if (msgStatus != m_currentStatus)
+        if (!m_runningStatus || (msgStatus != m_currentStatus))
         {
           // Filter running status.
           m_currentStatus = msgStatus;
