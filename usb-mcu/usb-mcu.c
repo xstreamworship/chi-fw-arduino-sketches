@@ -1,4 +1,25 @@
 /*
+     Chi-1p-40 USB-MCU Firmware Project
+     Copyright (C) 2018 Darcy Watkins
+     2018/10/22
+     darcy [at] xstreamworship [dot] com
+     http://xstreamworship.com
+
+     Multiplexed USB-MIDI interface (3 out/2 in):
+       port 0 - to/from Chi keyboard UI
+       port 1 - to/from MIDI-Out/MIDI-In jacks
+       port 3 - to MIDI/Thru/Out2 jack
+     Serial USB-MIDI multiplexed using 0xFD as a MIDI-escape sequence.
+     0xFD, 0x00 | (0x0f & port_cable_id) - to change the port MIDI stream.
+     0xFD, 0xFD - to insert the 0xFD byte (undefined / unused MIDI status code).
+     0xFD, [any other value] - both the 0xFD and the escaped byte are discarded.
+
+     MIDI router (details to be added).
+
+     Derived from dualMocoLUFA serial / USB-MIDI project
+     Derived from USB-MIDI interface LUFA Library project template.
+*/
+/*
      dualMocoLUFA Project
      Copyright (C) 2013 by morecat_lab
 
@@ -16,7 +37,9 @@
       www.fourwalledcubicle.com
 */
 /*
-  Copyright 2010  Dean Camera (dean [at] fourwalledcubicle [dot] com)
+  Copyright 2018 Darcy Watkins (darcy [at] xstreamworship [dot] com)
+  Copyright 2013 by morecat_lab (http://morecatlab.akiba.coocan.jp/)
+  Copyright 2010 Dean Camera (dean [at] fourwalledcubicle [dot] com)
 
   Permission to use, copy, modify, distribute, and sell this 
   software and its documentation for any purpose is hereby granted
@@ -39,14 +62,14 @@
 
 /** \file
  *
- *  Main source file for the dualMocoLUFA project. 
+ *  Main source file for the Chi-1p-40 USB MCU project. 
  * This file contains the main tasks of the project and is responsible for the initial application hardware configuration.
  */
 
-#include "dualMoco.h"
+#include "usb-mcu.h"
 #include "Arduino-usbserial.h"
 
-uchar mocoMode = 1;	/* 0: Serial , 1: MIDI */
+uchar systemMode = 1;	/* 0: Serial , 1: MIDI */
 uchar highSpeed = 0;		/* 0: normal speed(31250bps),
 				   1: high speed (1250000bps) */
 
@@ -261,7 +284,7 @@ uchar parseSerialMidiMessage(uchar RxByte) {
 int main(void) {
   SetupHardware();
 
-  if (mocoMode == 1) {
+  if (systemMode == 1) {
     processMIDI();
   } else {
     processSerial();
@@ -393,24 +416,19 @@ void SetupHardware(void) {
   MCUSR &= ~(1 << WDRF);
   wdt_disable();
 
-  /* PB1 = LED, PB2 = (MIDI/SERIAL), PB3 (NORMAL/HIGH) */
+  /* PB1 = LED, PB2 = (MIDI/SERIAL), PB3 (reserved) */
   DDRB = 0x02;		/* PB1 = OUTPUT, PB2 = INPUT, PB3 = INPUT */
   PORTB = 0x0C;		/* PULL-UP PB2, PB3 */
 
   if ((PINB & 0x04) == 0) { /* Arduino-serial (JUMPER BTW PB2-GND) */
-    mocoMode = 0;
+    systemMode = 0;
     Serial_Init(9600, false);
-  } else {		/* Moco mode */
-    mocoMode = 1;
-    //if ((PINB & 0x08) == 0) { /* high speed mode */
-      highSpeed = 1;
-      //UBRR1L = 1;		/* 500K at 16MHz clock */
-      UBRR1L = 0;		/* 1M at 16MHz clock */
-    //} else {
-    //  UBRR1L = 31;	/* 31250Hz at 16MHz clock */
-    //}
+  } else {		/* USB MIDI mode */
+    systemMode = 1;
+    highSpeed = 1;      /* Always at high speed */
+    UBRR1L = 0;		/* 1M at 16MHz clock */
     UCSR1B = (1<<RXEN1) | (1<<TXEN1);
-    PORTB = 0x0E;	       /* PORTB1 = HIGH */
+    PORTB = 0x0E;	/* PORTB1 = HIGH */
   }
 
   /* Start the flush timer so that overflows occur rapidly to push received bytes to the USB interface */
@@ -420,7 +438,7 @@ void SetupHardware(void) {
   USB_Init();
   LEDs_Init();
 
-  if (mocoMode == 0) {
+  if (systemMode == 0) {
     /* Pull target /RESET line high */
     AVR_RESET_LINE_PORT |= AVR_RESET_LINE_MASK;
     AVR_RESET_LINE_DDR  |= AVR_RESET_LINE_MASK;
@@ -437,7 +455,7 @@ void EVENT_USB_Device_Disconnect(void) {
 
 /** Event handler for the library USB Configuration Changed event. */
 void EVENT_USB_Device_ConfigurationChanged(void) {
-  if (mocoMode == 1) {
+  if (systemMode == 1) {
     bool ConfigSuccess = true;
     ConfigSuccess &= MIDI_Device_ConfigureEndpoints(&Keyboard_MIDI_Interface);
   } else {
@@ -447,14 +465,14 @@ void EVENT_USB_Device_ConfigurationChanged(void) {
 
 /** Event handler for the library USB Control Request reception event. */
 void EVENT_USB_Device_ControlRequest(void) {
-  if (mocoMode == 1) {
+  if (systemMode == 1) {
     MIDI_Device_ProcessControlRequest(&Keyboard_MIDI_Interface);
   }
 }
 
 /** Event handler for the library USB Unhandled Control Request event. */
 void EVENT_USB_Device_UnhandledControlRequest(void) {
-  if (mocoMode == 0) {
+  if (systemMode == 0) {
     CDC_Device_ProcessControlRequest(&VirtualSerial_CDC_Interface);
   } else {
     MIDI_Device_ProcessControlRequest(&Keyboard_MIDI_Interface);
@@ -513,7 +531,7 @@ void EVENT_CDC_Device_LineEncodingChanged(USB_ClassInfo_CDC_Device_t* const CDCI
  *  for later transmission to the host.
  */
 ISR(USART1_RX_vect, ISR_BLOCK) {
-  if (mocoMode == 0) {
+  if (systemMode == 0) {
     uint8_t ReceivedByte = UDR1;
 
     if (USB_DeviceState == DEVICE_STATE_Configured)
@@ -527,9 +545,10 @@ ISR(USART1_RX_vect, ISR_BLOCK) {
  */
 void EVENT_CDC_Device_ControLineStateChanged(USB_ClassInfo_CDC_Device_t* const CDCInterfaceInfo) {
   bool CurrentDTRState = (CDCInterfaceInfo->State.ControlLineStates.HostToDevice & CDC_CONTROL_LINE_OUT_DTR);
-	
+
   if (CurrentDTRState)
     AVR_RESET_LINE_PORT &= ~AVR_RESET_LINE_MASK;
   else
     AVR_RESET_LINE_PORT |= AVR_RESET_LINE_MASK;
 }
+

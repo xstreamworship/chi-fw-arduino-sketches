@@ -1,4 +1,25 @@
 /*
+     Chi-1p-40 USB-MCU Firmware Project
+     Copyright (C) 2018 Darcy Watkins
+     2018/10/22
+     darcy [at] xstreamworship [dot] com
+     http://xstreamworship.com
+
+     Multiplexed USB-MIDI interface (3 out/2 in):
+       port 0 - to/from Chi keyboard UI
+       port 1 - to/from MIDI-Out/MIDI-In jacks
+       port 3 - to MIDI/Thru/Out2 jack
+     Serial USB-MIDI multiplexed using 0xFD as a MIDI-escape sequence.
+     0xFD, 0x00 | (0x0f & port_cable_id) - to change the port MIDI stream.
+     0xFD, 0xFD - to insert the 0xFD byte (undefined / unused MIDI status code).
+     0xFD, [any other value] - both the 0xFD and the escaped byte are discarded.
+
+     MIDI router (details to be added).
+
+     Derived from dualMocoLUFA serial / USB-MIDI project
+     Derived from USB-MIDI interface LUFA Library project template.
+*/
+/*
      dualMocoLUFA Project
      Copyright (C) 2013 by morecat_lab
 
@@ -17,7 +38,9 @@
 */
 
 /*
-  Copyright 2010  Dean Camera (dean [at] fourwalledcubicle [dot] com)
+  Copyright 2018 Darcy Watkins (darcy [at] xstreamworship [dot] com)
+  Copyright 2013 by morecat_lab (http://morecatlab.akiba.coocan.jp/)
+  Copyright 2010 Dean Camera (dean [at] fourwalledcubicle [dot] com)
 
   Permission to use, copy, modify, distribute, and sell this 
   software and its documentation for any purpose is hereby granted
@@ -46,7 +69,7 @@
  */
 
 #include "Descriptors.h"
-#include "dualMoco.h"
+#include "usb-mcu.h"
 
 /* On some devices, there is a factory set internal serial number which can be automatically sent to the host as
  * the device's serial number when the Device Descriptor's .SerialNumStrIndex entry is set to USE_INTERNAL_SERIAL.
@@ -579,7 +602,7 @@ uint16_t CALLBACK_USB_GetDescriptor(const uint16_t wValue,
 	switch (DescriptorType)
 	{
 		case DTYPE_Device: 
-		  if (mocoMode == 1) {
+		  if (systemMode == 1) {
 			Address = (void*)&DeviceDescriptorMIDI;
 			Size    = sizeof(USB_Descriptor_Device_t);
 		  } else {
@@ -588,7 +611,7 @@ uint16_t CALLBACK_USB_GetDescriptor(const uint16_t wValue,
 		  }
 			break;
 		case DTYPE_Configuration: 
-		  if (mocoMode == 1) {
+		  if (systemMode == 1) {
 			Address = (void*)&ConfigurationDescriptorMIDI;
 			Size    = sizeof(USB_Descriptor_ConfigurationMIDI_t);
 		  } else {
@@ -604,7 +627,7 @@ uint16_t CALLBACK_USB_GetDescriptor(const uint16_t wValue,
 					Size    = pgm_read_byte(&LanguageString.Header.Size);
 					break;
 				case 0x01:
-				  if (mocoMode == 1) {
+				  if (systemMode == 1) {
 					Address = (void*)&ManufacturerStringMIDI;
 					Size    = pgm_read_byte(&ManufacturerStringMIDI.Header.Size);
 				  } else {
@@ -613,7 +636,7 @@ uint16_t CALLBACK_USB_GetDescriptor(const uint16_t wValue,
 				  }
 					break;
 				case 0x02:
-				  if (mocoMode == 1) {
+				  if (systemMode == 1) {
 					Address = (void*)&ProductStringMIDI;
 					Size    = pgm_read_byte(&ProductStringMIDI.Header.Size);
 				  } else {
@@ -622,31 +645,31 @@ uint16_t CALLBACK_USB_GetDescriptor(const uint16_t wValue,
 				  }
 					break;
 				case 0x03:
-				  if (mocoMode == 1) {
+				  if (systemMode == 1) {
 					Address = (void*)&MIDIInJackStringMIDI;
 					Size    = pgm_read_byte(&MIDIInJackStringMIDI.Header.Size);
 				  }
 					break;
 				case 0x04:
-				  if (mocoMode == 1) {
+				  if (systemMode == 1) {
 					Address = (void*)&MIDIOutJackStringMIDI;
 					Size    = pgm_read_byte(&MIDIOutJackStringMIDI.Header.Size);
 				  }
 					break;
 				case 0x05:
-				  if (mocoMode == 1) {
+				  if (systemMode == 1) {
 					Address = (void*)&MIDIThruJackStringMIDI;
 					Size    = pgm_read_byte(&MIDIThruJackStringMIDI.Header.Size);
 				  }
 					break;
 				case 0x06:
-				  if (mocoMode == 1) {
+				  if (systemMode == 1) {
 					Address = (void*)&MIDIInInternalStringMIDI;
 					Size    = pgm_read_byte(&MIDIInInternalStringMIDI.Header.Size);
 				  }
 					break;
 				case 0x07:
-				  if (mocoMode == 1) {
+				  if (systemMode == 1) {
 					Address = (void*)&MIDIOutInternalStringMIDI;
 					Size    = pgm_read_byte(&MIDIOutInternalStringMIDI.Header.Size);
 				  }

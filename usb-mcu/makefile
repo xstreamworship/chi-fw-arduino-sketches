@@ -1,7 +1,7 @@
 # Hey Emacs, this is a -*- makefile -*-
 #----------------------------------------------------------------------------
 # WinAVR Makefile Template written by Eric B. Weddington, J¢ørg Wunsch, et al.
-#  >> Modified for use with the LUFA project. <<
+#  >> Modified for use with Chi project USB-MCU firmware. <<
 #
 # Released to the Public Domain
 #
@@ -65,7 +65,7 @@
 
 # for Uno R2
 #MCU = atmega8u2
-# for Uno R3
+# for Uno R3 / Mega2560 R3
 MCU = atmega16u2
 
 MCU_AVRDUDE = $(MCU)
@@ -129,7 +129,7 @@ FORMAT = ihex
 
 
 # Target file name (without extension).
-TARGET = dualMoco
+TARGET = usb-mcu
 
 
 # Object files directory
@@ -798,3 +798,4 @@ $(shell mkdir $(OBJDIR) 2>/dev/null)
 build elf hex eep lss sym coff extcoff doxygen clean          \
 clean_list clean_doxygen program dfu flip flip-ee dfu-ee      \
 debug gdb-config
+
