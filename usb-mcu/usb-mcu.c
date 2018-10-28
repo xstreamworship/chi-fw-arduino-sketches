@@ -88,8 +88,17 @@ volatile struct {
 
 #define    RX_SIZE        (HW_CDC_BULK_IN_SIZE)
 static uchar utxrdy = FALSE;	/* USB Packet ready in utx_buf */
-static uchar rx_buf[RX_SIZE];	/* tempory buffer */
 static uchar utx_buf[RX_SIZE];	/* BULK_IN buffer */
+
+/* Even though 16 cables are possible, we only support 2. */
+#define    RX_CABLE_DESCS 2
+static struct {
+  uchar PC;
+  uchar SysEx;
+  uchar sysExCnt;
+  uchar rx_buf[RX_SIZE];	/* tempory buffer */
+} RxCableDesc[RX_CABLE_DESCS] = { 0 };
+
 
 #define    TX_SIZE        (HW_CDC_BULK_OUT_SIZE<<2)
 #define    TX_MASK        (TX_SIZE-1)
@@ -176,10 +185,7 @@ void parseUSBMidiMessage(uchar *data, uchar len) {
 
 uchar parseSerialMidiMessage(uchar RxByte) {
   static uchar cable = 0;
-  static uchar PC = 0;
-  static uchar SysEx = FALSE;
   static uchar EscapeSeq = FALSE;
-  static uchar sysExCnt = 0;
   static uchar stateTransTable[] = {
     0, 				/* 0 dummy */
     0,				/* 1 dummy */
@@ -198,9 +204,15 @@ uchar parseSerialMidiMessage(uchar RxByte) {
     15,				/* 14->15 Pitch Bend (3) */
     14 | 0x80			/* 15->14 */
   };
-
-  if (EscapeSeq){		/* Realtime multi-byte escape sequence */
-    if (RxByte == 0xfd){	/* This means that hereto undefined MIDI 0xfd is actually in use. */
+  if (EscapeSeq) {		/* Realtime multi-byte escape sequence */
+    if ((RxByte & 0xf0) == 0x00) {
+      /* Change cable number (serial to USB direction). */
+      cable = RxByte & 0x0f;
+      EscapeSeq = FALSE;
+      return FALSE;
+    }
+    if ((cable < RX_CABLE_DESCS) && (RxByte == 0xfd)) {
+      /* This means that hereto undefined MIDI 0xfd is actually in use. */
       /* Treat as single byte realtime MIDI message. */
       utx_buf[0] = 0x0f + (cable << 4);
       utx_buf[1] = RxByte;
@@ -209,68 +221,68 @@ uchar parseSerialMidiMessage(uchar RxByte) {
       EscapeSeq = FALSE;
       return TRUE;
     }
-    if ((RxByte & 0xf0) == 0x00) {
-      /* Change cable number (serial to USB direction). */
-      cable = RxByte & 0x0f;
-      EscapeSeq = FALSE;
-      return FALSE;
-    }
-    /* Otherwise unsupported escape sequence, ignore it. */
+    /* Otherwise unsupported cable ID, or unsupported escape sequence, ignore it. */
     /* Note: Backwards compatibility is not assured if the escape sequence exceeds one byte. */
     EscapeSeq = FALSE;
-    return FALSE;
-  }
-  if(SysEx){  		/* MIDI System Message */
-    if(RxByte == 0xf7){		/* MIDI_EndSysEx */
-      utx_buf[sysExCnt++] = RxByte;
-      utx_buf[0] = ((sysExCnt + 3) & 0x0f) + (cable << 4); /* 0x05(single byte), 0x06(two bytes), or 0x07(three bytes) */
-      SysEx = FALSE;
-      PC = 0;
-      return TRUE;		/* send sysEx */
-    } else {
-      utx_buf[sysExCnt++] = RxByte;
-      if (sysExCnt == 4) {	/* buffer full */
-	utx_buf[0] = 0x04 + (cable << 4);	/* sysEx start */
-	sysExCnt = 1;
-	return TRUE;		/* send sysEx */
-      }
-    }
     return FALSE;
   }
   if (RxByte == 0xfd){		/* Realtime multi-byte escape sequence */
     EscapeSeq = TRUE;
     return FALSE;
-  } else if (RxByte >= 0xf8){	/* Single Byte Message */
+  }
+  if (cable >= RX_CABLE_DESCS) {
+    /* Unsupported cable ID, ignore all until escape sequence puts us back on track. */
+    return FALSE;
+  }
+  if (RxCableDesc[cable].SysEx){  		/* MIDI System Message */
+    if (RxByte == 0xf7){		/* MIDI_EndSysEx */
+      RxCableDesc[cable].rx_buf[RxCableDesc[cable].sysExCnt++] = RxByte;
+      RxCableDesc[cable].rx_buf[0] = ((RxCableDesc[cable].sysExCnt + 3) & 0x0f) + (cable << 4); /* 0x05(single byte), 0x06(two bytes), or 0x07(three bytes) */
+      memcpy(utx_buf, RxCableDesc[cable].rx_buf, 4);
+      RxCableDesc[cable].SysEx = FALSE;
+      RxCableDesc[cable].PC = 0;
+      return TRUE;		/* send sysEx */
+    } else {
+      RxCableDesc[cable].rx_buf[RxCableDesc[cable].sysExCnt++] = RxByte;
+      if (RxCableDesc[cable].sysExCnt == 4) {	/* buffer full */
+	RxCableDesc[cable].rx_buf[0] = 0x04 + (cable << 4);	/* sysEx start */
+        memcpy(utx_buf, RxCableDesc[cable].rx_buf, 4);
+	RxCableDesc[cable].sysExCnt = 1;
+	return TRUE;		/* send sysEx */
+      }
+    }
+    return FALSE;
+  }
+  if (RxByte >= 0xf8){	/* Single Byte Message */
     utx_buf[0] = 0x0f + (cable << 4);
     utx_buf[1] = RxByte;
     utx_buf[2] = 0;
     utx_buf[3] = 0;
     return TRUE;
   }
-
   if(RxByte > 0x7f){		/* Channel message */
     if(RxByte == 0xf0){		/* MIDI_StartSysEx */
-      SysEx = TRUE;
-      utx_buf[1] = 0xf0;
-      sysExCnt = 2;		/* start utx_buf[2]  */
+      RxCableDesc[cable].SysEx = TRUE;
+      RxCableDesc[cable].rx_buf[1] = 0xf0;
+      RxCableDesc[cable].sysExCnt = 2;		/* start utx_buf[2]  */
       return FALSE;
     }
-    PC = 0;
+    RxCableDesc[cable].PC = 0;
   }
 
-  if (PC == 0) {
-    PC = (((RxByte >> 4) & 0x07) + 1) * 2;
+  if (RxCableDesc[cable].PC == 0) {
+    RxCableDesc[cable].PC = (((RxByte >> 4) & 0x07) + 1) * 2;
     // conversion
     // 0x80 -> 2, 0x90 -> 4, 0xa0 -> 6, 0xb0 -> 8, 0xc0 -> 10, 0xd0 -> 12, 0xe0 -> 14
-    rx_buf[0] = RxByte >> 4;
-    rx_buf[1] = RxByte;
-    rx_buf[3] = 0;
+    RxCableDesc[cable].rx_buf[0] = RxByte >> 4;
+    RxCableDesc[cable].rx_buf[1] = RxByte;
+    RxCableDesc[cable].rx_buf[3] = 0;
   } else {
-    uchar tt = stateTransTable[PC];
-    rx_buf[(PC & 1) + 2] = RxByte;
-    PC = tt & 0x0f;
+    uchar tt = stateTransTable[RxCableDesc[cable].PC];
+    RxCableDesc[cable].rx_buf[(RxCableDesc[cable].PC & 1) + 2] = RxByte;
+    RxCableDesc[cable].PC = tt & 0x0f;
     if ((tt & 0x80) != 0) {
-      memcpy(utx_buf, rx_buf, 4);
+      memcpy(utx_buf, RxCableDesc[cable].rx_buf, 4);
       utx_buf[0] = (utx_buf[0] & 0x0f) + (cable << 4);
       return TRUE;
     }

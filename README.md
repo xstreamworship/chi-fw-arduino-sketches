@@ -1,19 +1,19 @@
 # chi-fw-arduino-sketches
 CHI Firmware / Arduino Sketches
 
-Work-in-progress
-================
+Chi-1p-40
+=========
 
 Chi-1p-40 is my first MIDI keyboard built from bits and pieces of hardware, including:
  - 40 key section of weighted keys from a Roland HP-5600.
- - LED/Switch matrix and MIDI / foot switch jack interface boards from Rolan HP-5600.
- - Other bits of metal and hardware from the Rolan HP-5600.
- - Custom designed / built boards (all the Roland boards were mod'ed as well).
+ - LED/Switch matrix and MIDI / foot switch jack interface boards from Roland HP-5600.
+ - Other bits of metal and hardware from the Roland HP-5600.
+ - Custom designed / built boards (all reused Roland boards were mod'ed as well).
  - Set of nine (9) Hammond organ draw bars, rewired / mod'ed to be scanned as inputs.
  - Assembly (3D printed) to hold an industrial grade joystick and a toggle switch to
    control rotary effect speed.
  - Numerous wire harnesses (many mod'ed from hardware pulled from the Roland).
- - Two Arduino boards.
+ - Two Arduino boards (an Arduino Mega-2560 and an Arduino Mini-Pro).
  - A USB 3.0 / 2.0 hub.
  - A 5 volt power supply capable of powering the whole thing (including USB peripherals).
 
@@ -61,7 +61,8 @@ All Rights Reserved
 
 Note: Some source files are derived works, having additional copyrights from other parties.  See the
       source files.  This project also includes LUFA-100807 USB library from fourwalledcubicle.com,
-      under its own copyright and license.
+      under its own copyright and license.  The USB MCU source, derived from example code templates
+      originating from LUFA Library, and the LUFA library itself, use a BSD like license.
 
 License
 =======

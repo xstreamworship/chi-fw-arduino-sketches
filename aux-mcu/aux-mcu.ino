@@ -103,15 +103,15 @@ const PROGMEM char AnalogFilterStr6[] = "JoyX";
 const PROGMEM char AnalogFilterStr7[] = "JoyY";
 CFilter analogFilters[] =
 {
-  //      name               thresh  origin ormrgn   min   mnmrgn max   mxmrgn  CC   use case
-  CFilter(AnalogFilterStr0,   32,     0,      0,      0,     0,   4095,  0,     90,  E_AUC_SIMPLE_CC),
-  CFilter(AnalogFilterStr1,   32,     0,      594,    0,     0,   4095,  61,    4,   E_AUC_SCALED_19_16_CC),
-  CFilter(AnalogFilterStr2,   32,     0,      0,      0,     0,   4095,  0,     70,  E_AUC_SIMPLE_CC),
-  CFilter(AnalogFilterStr3,   32,     0,      594,    0,     0,   4095,  61,    11,  E_AUC_SCALED_19_16_CC),
-  CFilter(AnalogFilterStr4,   32,     0,      0,      0,     0,   4095,  0,     7,   E_AUC_SIMPLE_CC),
-  CFilter(AnalogFilterStr5,   16,     2016,   130,    0,     70,  4095,  133,   2,   E_AUC_JOYSTICK),
-  CFilter(AnalogFilterStr6,   8,      2010,   100,    0,     94,  4095,  169,   0,   E_AUC_JOYSTICK),
-  CFilter(AnalogFilterStr7,   8,      2044,   100,    0,     18,  4095,  25,    1,   E_AUC_JOYSTICK),
+  //      name              filter                  thresh  origin  ormrgn  min  mnmrgn max    mxmrgn CC   use case
+  CFilter(AnalogFilterStr0, CFilter::E_FILT_0P125,  32,     0,      0,      0,   0,     4095,  0,     90,  E_AUC_SIMPLE_CC),
+  CFilter(AnalogFilterStr1, CFilter::E_FILT_0P625,  32,     0,      594,    0,   0,     4095,  61,    4,   E_AUC_SCALED_19_16_CC),
+  CFilter(AnalogFilterStr2, CFilter::E_FILT_0P125,  32,     0,      0,      0,   0,     4095,  0,     70,  E_AUC_SIMPLE_CC),
+  CFilter(AnalogFilterStr3, CFilter::E_FILT_0P625,  32,     0,      594,    0,   0,     4095,  61,    11,  E_AUC_SCALED_19_16_CC),
+  CFilter(AnalogFilterStr4, CFilter::E_FILT_0P125,  32,     0,      0,      0,   0,     4095,  0,     7,   E_AUC_SIMPLE_CC),
+  CFilter(AnalogFilterStr5, CFilter::E_FILT_0P625,  16,     2016,   130,    0,   56,    4095,  133,   2,   E_AUC_JOYSTICK),
+  CFilter(AnalogFilterStr6, CFilter::E_FILT_0P625,  8,      2010,   100,    0,   80,    4095,  169,   0,   E_AUC_JOYSTICK),
+  CFilter(AnalogFilterStr7, CFilter::E_FILT_0P625,  8,      2044,   96,     0,   18,    4095,  25,    1,   E_AUC_JOYSTICK),
 };
 
 // Logical switch scanner.
@@ -247,16 +247,6 @@ void setLed(bool val)
   WRITE_BIT(ARDUINO_LED, ledState);
 }
 
-void noteOn(uint8_t note, uint8_t velocity, uint8_t channel)
-{
-  midiJacks.noteOn(note, velocity, channel);
-}
-
-void noteOff(uint8_t note, uint8_t velocity, uint8_t channel)
-{
-  midiJacks.noteOff(note, velocity, channel);
-}
-
 enum ERotaryStates
 {
   E_RS_BRAKED = 0,
@@ -271,8 +261,6 @@ unsigned long rotaryBrakeStart = 0;
 
 void switchChanged(bool state, uint8_t ccNum, uint8_t uCase)
 {
-//  uint8_t channel = CMidiKeySwitch::getMidiCh();
-  uint8_t channel = 0;
   uint8_t ccVal = state?127:0;
   if (ccNum > 119)
     // Note: Default value passed into an incompletely defined CSwitch scan() is 255.
@@ -280,7 +268,7 @@ void switchChanged(bool state, uint8_t ccNum, uint8_t uCase)
   switch (uCase)
   {
     case E_UC_SIMPLE_CC: // Simple switch mapped to CC use case
-      midiJacks.ctrlCh(ccNum, ccVal, channel);
+      midiJacks.ctrlCh(ccNum, ccVal);
       break;
     case E_UC_ROTARY_CC:
       switch(rotaryState)
@@ -289,14 +277,14 @@ void switchChanged(bool state, uint8_t ccNum, uint8_t uCase)
           if (state) {
             if (ccNum == 0) {
               // switched to slow
-              midiJacks.ctrlCh(80, 0, channel);
-              midiJacks.ctrlCh(81, 0, channel);
+              midiJacks.ctrlCh(80, 0);
+              midiJacks.ctrlCh(81, 0);
               rotaryState = E_RS_SLOW;
             } else if (ccNum == 1) {
               // switched to fast
-              midiJacks.ctrlCh(80, 127, channel);
-              midiJacks.ctrlCh(81, 0, channel);
-              midiJacks.ctrlCh(82, 127, channel);
+              midiJacks.ctrlCh(80, 127);
+              midiJacks.ctrlCh(81, 0);
+              midiJacks.ctrlCh(82, 127);
               rotaryState = E_RS_FAST;
             }
           }
@@ -304,27 +292,27 @@ void switchChanged(bool state, uint8_t ccNum, uint8_t uCase)
         case E_RS_SLOW:
           if ((ccNum == 0) && !state) {
             // switched to centre
-            midiJacks.ctrlCh(80, 64, channel);
+            midiJacks.ctrlCh(80, 64);
             rotaryState = E_RS_BRAKE_PENDING;
             // Start timer
             rotaryBrakeStart = micros();
           } else if ((ccNum == 1) && state) {
             // rapidly switched to fast
-            midiJacks.ctrlCh(80, 127, channel);
-            midiJacks.ctrlCh(82, 127, channel);
+            midiJacks.ctrlCh(80, 127);
+            midiJacks.ctrlCh(82, 127);
             rotaryState = E_RS_FAST;
           }
           break;
         case E_RS_FAST:
           if ((ccNum == 0) && state) {
             // rapidly switched to slow
-            midiJacks.ctrlCh(80, 0, channel);
-            midiJacks.ctrlCh(82, 0, channel);
+            midiJacks.ctrlCh(80, 0);
+            midiJacks.ctrlCh(82, 0);
             rotaryState = E_RS_SLOW;
           } else if ((ccNum == 1) && !state) {
             // switched to centre
-            midiJacks.ctrlCh(80, 64, channel);
-            midiJacks.ctrlCh(82, 0, channel);
+            midiJacks.ctrlCh(80, 64);
+            midiJacks.ctrlCh(82, 0);
             rotaryState = E_RS_BRAKE_PENDING;
             // Start timer
             rotaryBrakeStart = micros();
@@ -333,19 +321,19 @@ void switchChanged(bool state, uint8_t ccNum, uint8_t uCase)
         case E_RS_BRAKE_PENDING:
           if (ccNum = 2) {
             // Timeout
-            midiJacks.ctrlCh(81, 127, channel);
+            midiJacks.ctrlCh(81, 127);
             rotaryState = E_RS_BRAKED;
           } else if (state) {
             if (ccNum == 0) {
               // switched to slow
-              midiJacks.ctrlCh(80, 0, channel);
+              midiJacks.ctrlCh(80, 0);
               rotaryState = E_RS_SLOW;
               // Stop timer
               rotaryBrakeStart = 0;
             } else if (ccNum == 1) {
               // switched to fast
-              midiJacks.ctrlCh(80, 127, channel);
-              midiJacks.ctrlCh(82, 127, channel);
+              midiJacks.ctrlCh(80, 127);
+              midiJacks.ctrlCh(82, 127);
               rotaryState = E_RS_FAST;
               // Stop timer
               rotaryBrakeStart = 0;
@@ -364,55 +352,55 @@ void switchChanged(bool state, uint8_t ccNum, uint8_t uCase)
 bool joystickShifted = false;
 void analogChanged(bool state, uint16_t val, uint8_t ccNum, uint8_t uCase)
 {
-//  uint8_t channel = CMidiKeySwitch::getMidiCh();
-  uint8_t channel = 0;
   unsigned int ccVal = 127;
   switch (uCase)
   {
     case E_AUC_SIMPLE_CC:
       if (((val & 0xfe0) >> 5) < 127)
         ccVal = (val & 0xfe0) >> 5;
-      midiJacks.ctrlCh(ccNum, ccVal, channel);
+      midiJacks.ctrlCh(ccNum, ccVal);
       break;
     case E_AUC_SCALED_19_16_CC:
       if (((((val + (val >> 3) + (val >> 4))) & 0xfe0) >> 5) < 127)
         ccVal = (((val + (val >> 3) + (val >> 4))) & 0xfe0) >> 5;
-      midiJacks.ctrlCh(ccNum, ccVal, channel);
+      midiJacks.ctrlCh(ccNum, ccVal);
       break;
     case E_AUC_JOYSTICK:
       switch (ccNum)
       {
         case 0:
           // X axis (forward / backwards motion)
-          if (((((val + (val >> 3))) & 0xfe0) >> 4) < 127)
-            ccVal = (((val + (val >> 3))) & 0xfe0) >> 4;
+          ccVal = (val + (val >> 3)) >> 4;
           if (joystickShifted) {
             uint8_t shftVal = 64;
             if (ccVal) {
               if (state) {
-                if (ccVal < 128)
+                if (ccVal < 127)
                   shftVal = 64 + (ccVal >> 1);
                 else
                   shftVal = 127;
               } else {
-                if (ccVal <= 128)
+                if (ccVal < 128)
                   shftVal = 64 - (ccVal >> 1);
                 else
                   shftVal = 0;
               }
             }
-            midiJacks.ctrlCh(75, shftVal, channel);
+            midiJacks.ctrlCh(75, shftVal);
           } else {
+            if (ccVal > 127) {
+              ccVal = 127;
+            }
             if (ccVal == 0) {
               // At centre position so zero both CC's.
-              midiJacks.ctrlCh(1, 0, channel);
-              midiJacks.ctrlCh(2, 0, channel);
+              midiJacks.ctrlCh(1, 0);
+              midiJacks.ctrlCh(2, 0);
             } else if (state) {
               // Forward motion - modulation
-              midiJacks.ctrlCh(1, ccVal, channel);
+              midiJacks.ctrlCh(1, ccVal);
             } else {
               // Reverse motion - breath
-              midiJacks.ctrlCh(2, ccVal, channel);
+              midiJacks.ctrlCh(2, ccVal);
             }
           }
           break;
@@ -438,7 +426,7 @@ void analogChanged(bool state, uint16_t val, uint8_t ccNum, uint8_t uCase)
                   shftVal = 0;
               }
             }
-            midiJacks.ctrlCh(76, shftVal, channel);
+            midiJacks.ctrlCh(76, shftVal);
           } else {
             // Pitch bend
             uint16_t pbVal = 8192;
@@ -457,40 +445,42 @@ void analogChanged(bool state, uint16_t val, uint8_t ccNum, uint8_t uCase)
                   pbVal = 0;
               }
             }
-            midiJacks.pitchBend(pbVal, channel);
+            midiJacks.pitchBend(pbVal);
           }
           break;
         case 2:
           // Z axis (twist CW / CCW motion)
-          if (((((val + (val >> 3))) & 0xfe0) >> 4) < 127)
-            ccVal = (((val + (val >> 3))) & 0xfe0) >> 4;
+          ccVal = (val + (val >> 3)) >> 4;
           if (joystickShifted) {
             uint8_t shftVal = 64;
             if (ccVal) {
               if (state) {
-                if (ccVal < 128)
+                if (ccVal < 127)
                   shftVal = 64 + (ccVal >> 1);
                 else
                   shftVal = 127;
               } else {
-                if (ccVal <= 128)
+                if (ccVal < 128)
                   shftVal = 64 - (ccVal >> 1);
                 else
                   shftVal = 0;
               }
             }
-            midiJacks.ctrlCh(77, shftVal, channel);
+            midiJacks.ctrlCh(77, shftVal);
           } else {
+            if (ccVal > 127) {
+              ccVal = 127;
+            }
             if (ccVal == 0) {
               // At centre position so zero both CC's.
-              midiJacks.ctrlCh(12, 0, channel);
-              midiJacks.ctrlCh(13, 0, channel);
+              midiJacks.ctrlCh(12, 0);
+              midiJacks.ctrlCh(13, 0);
             } else if (state) {
               // CW motion
-              midiJacks.ctrlCh(12, ccVal, channel);
+              midiJacks.ctrlCh(12, ccVal);
             } else {
               // CCW motion
-              midiJacks.ctrlCh(13, ccVal, channel);
+              midiJacks.ctrlCh(13, ccVal);
             }
           }
           break;
@@ -506,11 +496,9 @@ void analogChanged(bool state, uint16_t val, uint8_t ccNum, uint8_t uCase)
 // Handle drawbar change
 void drawbarChanged(uint8_t val, uint8_t ccNum, uint8_t uCase)
 {
-//  uint8_t channel = CMidiKeySwitch::getMidiCh();
-  uint8_t channel = 0;
   uint8_t ccVal = (val >= 32)?127:(val * 4);
-  //
-  midiJacks.ctrlCh(ccNum, ccVal, channel);
+  // Draw bar motion
+  midiJacks.ctrlCh(ccNum, ccVal);
 }
 
 // The setup() function runs once at startup.
@@ -545,6 +533,11 @@ void setup()
 
   // Probe and initialize the AD7997 analog ports.
   AnalogA.begin();
+
+  // Initialize the filters.
+  for (uint8_t index = 0; index < 8; index++) {
+    analogFilters[index].begin(AnalogA.read(index));
+  }
 
   // Read in so we can check the DIP switches at startup.
 #if FORCE_DEBUG
@@ -609,12 +602,6 @@ void loop()
 
     // Flush output state to LED
     setLed(ledState);
-
-    if (debug_mode) {
-//      Serial.print(F("Profile Cycle Time: "));
-      // * 8 because it takes 8 cycles to scan the keyboard.
-//      Serial.println(cycleTime / CYCLE_WIN_SZ * 8);
-    }
   }
 
   enum e_ScanStates
@@ -707,7 +694,7 @@ void loop()
 
       if (analog_ch_index < 7) {
         // start for the next analog.
-        AnalogA.sync(++analog_ch_index);
+        AnalogA.start(++analog_ch_index);
         break;
       }
 
@@ -726,9 +713,5 @@ void loop()
       state = E_SCAN_START;
       break;
   }
-
-//  uint32_t endTime = micros();
-
-//  update_cycle_time(endTime - startTime);
 }
 

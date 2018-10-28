@@ -71,7 +71,6 @@ const int midiCableDetectPin = 40;
 #define MODE_SWITCH_BIT 0
 const int modeSwitchPin = 41;
 
-
 #define DIP_SW1_PORT PORTE
 #define DIP_SW1_PIN PINE
 #define DIP_SW1_BIT 4
@@ -215,7 +214,12 @@ CMidiKeySwitch keyboard[] =
   CMidiKeySwitch(NoteC5Str),
 };
 
-// The USB connector setup as MIDI (requires change in firmware in the USB MCU).
+// The USB connector setup as MIDI (multiplexes virtual cables with USB MCU).
+enum UsbMidiCables {
+  E_USBMIDI_INTERNAL = 0,
+  E_USBMIDI_JACK1 = 1,
+  E_USBMIDI_JACK2 = 2,
+};
 CMidiPort<HardwareSerial> midiUSB((HardwareSerial&)Serial);
 
 // The main MIDI-Out and MIDI-In jacks on back of the keyboard.
@@ -265,7 +269,7 @@ void switch_led_scan_next_column( uint32_t timeS )
   // LS 7bits are the CC num, MSB is the use case selector between shift and shifted.
   uint8_t ccMap[] = { 128, 106, 102, 129, 107, 103, 93, 108, 104, 92, 109, 105 };
 
-  // Scan the rows (at end of cycle before selecting nect column).
+  // Scan the rows (at end of cycle before selecting next column).
   // Read & mask the present value.
   // TODO - MSB is arduino LED - roll this into same funtion to speed things up.
   const uint8_t mask = 0x80;
@@ -314,7 +318,6 @@ static unsigned kbd_scan_column_index = 0;
 void kbd_select_next_column( void )
 {
   uint8_t pattern[8] = { 0x7f, 0xbf, 0xdf, 0xef, 0xf7, 0xfb, 0xfd, 0xfe };
-//  uint8_t pattern[8] = { 0xfe, 0xfd, 0xfb, 0xf7, 0xef, 0xdf, 0xbf, 0x7f };
   PORTL = pattern[kbd_scan_column_index];
 }
 
@@ -362,14 +365,12 @@ void setLed(bool val)
 
 void noteOn(uint8_t note, uint8_t velocity, uint8_t channel)
 {
-  midiJacks.noteOn(note, velocity, channel);
-  midiUSB.noteOn(note, velocity, channel);
+  midiUSB.noteOn(note, velocity, channel, E_USBMIDI_INTERNAL);
 }
 
 void noteOff(uint8_t note, uint8_t velocity, uint8_t channel)
 {
-  midiJacks.noteOff(note, velocity, channel);
-  midiUSB.noteOff(note, velocity, channel);
+  midiUSB.noteOff(note, velocity, channel, E_USBMIDI_INTERNAL);
 }
 
 //                        Trans PC 1  2  3   4  5  6  7   8  Ch Trem
@@ -395,8 +396,7 @@ void switchChanged(bool state, uint8_t ccNum, uint8_t uCase)
   switch (uCase)
   {
     case E_UC_SIMPLE_CC: // Simple switch mapped to CC use case
-      midiJacks.ctrlCh(ccNum, ccVal, channel);
-      midiUSB.ctrlCh(ccNum, ccVal, channel);
+      midiUSB.ctrlCh(ccNum, ccVal, channel, E_USBMIDI_INTERNAL);
       break;
     case E_UC_SHIFT:
       if (state) break; // Only process the switch release.
@@ -444,8 +444,7 @@ void switchChanged(bool state, uint8_t ccNum, uint8_t uCase)
       {
         case E_SS_UNSHIFTED:
           // Unshifted, so this switch sends out a CC
-          midiJacks.ctrlCh(ccNum, ccVal, channel);
-          midiUSB.ctrlCh(ccNum, ccVal, channel);
+          midiUSB.ctrlCh(ccNum, ccVal, channel, E_USBMIDI_INTERNAL);
           break;
         case E_SS_PROGCH:
 #if 0
@@ -478,8 +477,7 @@ void switchChanged(bool state, uint8_t ccNum, uint8_t uCase)
           if (newPC != currentPC) {
             // Only send out a PC message if the value has changed.
             currentPC = newPC;
-            midiJacks.progCh(currentPC, channel);
-            midiUSB.progCh(currentPC, channel);
+            midiUSB.progCh(currentPC, channel, E_USBMIDI_INTERNAL);
           }
           syncLedsToProgChange();
           break;
@@ -518,6 +516,32 @@ void handleProgCh(uint8_t pcVal, uint8_t channel)
 {
   currentPC = pcVal;
   syncLedsToProgChange();
+}
+
+void handleRxMidi(uint8_t status, uint8_t data1, uint8_t data2, uint8_t channel)
+{
+  if (status == 0xb0)
+    handleCtrlCh(data1, data2, channel);
+  else if (status == 0xc0)
+    handleProgCh(data1, channel);
+}
+
+void handleB2BMidi(uint8_t status, uint8_t data1, uint8_t data2, uint8_t channel)
+{
+  if (!debug_mode) {
+    if (status != 0xc0) {
+      midiUSB.send(status, data1, data2, channel, E_USBMIDI_INTERNAL);
+    }
+  } else {
+    Serial.print(F("Aux MIDI: "));
+    Serial.print(status);
+    Serial.print(F(", "));
+    Serial.print(data1);
+    Serial.print(F(", "));
+    Serial.print(data2);
+    Serial.print(F(" - ch: "));
+    Serial.println(channel);
+  }
 }
 
 // TODO - FIXME - Rotary encoder appears to advance 2 counts per click while turning
@@ -653,7 +677,7 @@ void setup()
 
   if (!debug_mode) {
     // Use USB serial for MIDI (and at 1.25Mb/s)
-    midiUSB.begin(&setLed, &handleCtrlCh, &handleProgCh, 1250000);
+    midiUSB.begin(&setLed, &handleRxMidi, 1250000);
   } else {
     // Initialize serial UART for debug output.
 #if ! FORCE_DEBUG
@@ -693,53 +717,24 @@ void setup()
 
   // Setup serial ports used for MIDI (Serial port 0 [USB] already setup earlier).
   // Serial1 - MIDI-In / MIDI-Out connectors.
-  midiJacks.begin(&setLed, &handleCtrlCh, &handleProgCh);
+  midiJacks.begin(&setLed);
   // Serial2 - MIDI-In from Aux MCU [B2B] / MIDI-Thru/Out2 connector.
   if (debug_mode_aux) {
     // When Aux MCU debug mode set, we lose the MIDI-Thru/Out2
     Serial2.begin(230400);
   } else {
-    // FIXME - TODO - need to implement any needed hooks for merging, etc.
     // Start the MIDI port.
-    midiB2bThru.begin(&setLed);
+    midiB2bThru.begin(&setLed, &handleB2BMidi);
   }
   // Serial3 - spare / unused.
 }
 
-// The loop() function runs over and over again.
-
-#define CYCLE_WIN_SZ 32
-unsigned long cycleTimes[CYCLE_WIN_SZ] = { 0 };
-unsigned long cycleTime = 0;
-int cycleInd = 0;
-
-void update_cycle_time(uint32_t delta)
-{
-  cycleTime -= cycleTimes[cycleInd];
-  cycleTimes[cycleInd] = delta;
-  cycleTime += cycleTimes[cycleInd];
-  
-  if (cycleInd < (CYCLE_WIN_SZ - 1))
-    cycleInd++;
-  else
-    cycleInd = 0;
-}
-
-
-//unsigned long nextSecondsMicros = 0;
-
+// The loop() function is invoked over and over again.
+static uint8_t midiBuffer[64];
 void loop()
 {
+  size_t len;
   unsigned long currentMicros = micros();
-
-#if 0
-if (currentMicros >= nextSecondsMicros) {
-  // Passed a 1sec tick mark
-  Serial.print(F("Seconds: "));
-  Serial.println(nextSecondsMicros / 1000000);
-  nextSecondsMicros += 1000000;
-}
-#endif
 
   static unsigned long lastLEDSwitchScanMicros = 0;
   static unsigned led = 0;
@@ -752,12 +747,16 @@ if (currentMicros >= nextSecondsMicros) {
       } else {
         ledState = LOW;
       }
-    } else {
-      // Active sense
-      midiUSB.activeSense();
     }
-    midiJacks.activeSense();
-    //midiB2bThru.activeSense();
+
+    // Active sense
+    if (!debug_mode) {
+      //midiUSB.activeSense(E_USBMIDI_INTERNAL);
+    }
+    //midiJacks.activeSense();
+    if (!debug_mode_aux) {
+      //midiB2bThru.activeSense();
+    }
 
     // Flush output state to LED
     setLed(ledState);
@@ -768,9 +767,6 @@ if (currentMicros >= nextSecondsMicros) {
       }
       led++;
       led %= 12;
-//      Serial.print(F("Profile Cycle Time: "));
-      // * 8 because it takes 8 cycles to scan the keyboard.
-//      Serial.println(cycleTime / CYCLE_WIN_SZ * 8);
 
       noInterrupts();
       int pos = rearEncoderPosCount;
@@ -782,8 +778,6 @@ if (currentMicros >= nextSecondsMicros) {
       }
     }
   }
-
-//  uint32_t startTime = micros();
 
   // Scan the keyboard rows.
   kbd_scan_keys_selected_column();
@@ -805,10 +799,26 @@ if (currentMicros >= nextSecondsMicros) {
   }
 
   // Check for and handle receive MIDI messages from USB.
-  midiUSB.receiveScan();
+  // USB-MIDI cable 1 - parse to internal
+  midiUSB.receiveScan(10, CMidiKeySwitch::getMidiCh(), 1 << E_USBMIDI_INTERNAL);
+  // USB-MIDI cable 2 - pass through to MIDI-Out Jack
+  if ((len = midiUSB.read(midiBuffer, sizeof(midiBuffer), 1 << E_USBMIDI_JACK1)) > 0) {
+    midiJacks.write(midiBuffer, len);
+  }
+  // USB-MIDI cable 3 - pass through to MIDI-Thru/Out2 Jack
+  if ((len = midiUSB.read(midiBuffer, sizeof(midiBuffer), 1 << E_USBMIDI_JACK2)) > 0) {
+    if (!debug_mode_aux) {
+      midiB2bThru.write(midiBuffer, len);
+    }
+  }
+  // USB-MIDI anything spurious aimed at other cables
+  midiUSB.receiveFlush(0xfff8);
 
   // Check for and handle receive MIDI messages from MIDI-In connector.
-  midiJacks.receiveScan();
+  // Pass through to USB MIDI cable 2.
+  if ((len = midiJacks.read(midiBuffer, sizeof(midiBuffer))) > 0) {
+    midiUSB.write(midiBuffer, len, E_USBMIDI_JACK1);
+  }
 
   // Check for and handle receive MIDI messages.
   if (debug_mode_aux) {
@@ -826,9 +836,5 @@ if (currentMicros >= nextSecondsMicros) {
   } else {
     midiB2bThru.receiveScan();
   }
-
-//  uint32_t endTime = micros();
-
-//  update_cycle_time(endTime - startTime);
 }
 

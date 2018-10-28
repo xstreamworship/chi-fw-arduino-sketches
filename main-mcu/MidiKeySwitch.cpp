@@ -160,8 +160,6 @@ void CMidiKeySwitch::noteOn(uint8_t note, unsigned long ttime)
   }
 }
 
-extern unsigned long cycleTime;
-
 void CMidiKeySwitch::noteOff(uint8_t note, unsigned long ttime)
 {
   uint8_t vel = 0;
@@ -174,8 +172,6 @@ void CMidiKeySwitch::noteOff(uint8_t note, unsigned long ttime)
     Serial.print(ttime);
     Serial.print(F("[ "));
     Serial.print(s_glitchCount);
-    Serial.print(F(", "));
-    Serial.print(cycleTime / 8);
     Serial.println(F(" ]"));
   }
 }
