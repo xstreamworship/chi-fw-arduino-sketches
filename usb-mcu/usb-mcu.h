@@ -119,7 +119,7 @@
 		void EVENT_CDC_Device_ControLineStateChanged(USB_ClassInfo_CDC_Device_t* const CDCInterfaceInfo);		
 
 		uchar parseSerialMidiMessage(uchar);
-		void parseUSBMidiMessage(uchar *, uchar);
+		void parseUSBMidiMessage(uchar *);
 	/* shared variable */
 		extern uchar systemMode;
 

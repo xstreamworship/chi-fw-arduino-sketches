@@ -52,6 +52,12 @@ To setup the project and upload the Arduino usbserial application firmware to an
 Alternately use ISP (such as USB ASP, etc) with avrdude to program.  With correct programmer selected using AVRDUDE_PROGRAMMER variable in
 makefile, you can programn it by invoking "make program".  May need to prefix with 'sudo' for access permission to the programmer (Linux).
 
+Chi has a 6 pin ISP header on the Arduino shield connected to the USB MCU.  With top panel flipped up (opened), top right pin is ground.
+From that, can determine orientation of the ISP programmer.  And jumper as shown 'VVV' below when programming the Arduino.
+    VVV
+  o o-x--- Gnd
+  o o o
+
 Check that the board enumerates as either "Arduino Uno" or "Arduino Mega 2560".  Test by uploading a new Arduino sketch from the Arduino IDE.
 
 Other firmware (main-mcu and aux-mcu) are Arduino sketches.

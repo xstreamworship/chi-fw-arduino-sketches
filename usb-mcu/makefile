@@ -534,6 +534,8 @@ lib: $(LIBNAME)
 $(LUFA_PATH)/LUFA/makefile:
 	@unzip $(LUFA_ARCHIVE)
 	@mv LUFA\ $(LUFA_VERSION) lufa-$(LUFA_VERSION)
+	@dos2unix lufa-$(LUFA_VERSION)/LUFA/Drivers/USB/Class/Device/MIDI.c
+	@cd lufa-$(LUFA_VERSION) && patch -p 1 < ../lufa-fix-discard-on-busy.patch
 
 # Eye candy.
 # AVR Studio 3.x does not check make's exit code but relies on

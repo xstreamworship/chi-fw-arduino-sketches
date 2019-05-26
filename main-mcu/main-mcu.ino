@@ -663,6 +663,9 @@ void setup()
 #if FORCE_DEBUG
   Serial.begin(230400);
   Serial.println(F("Chi - forced debug"));
+#else
+  // Allow time for USB MCU to come up.
+  delay(500);
 #endif
 
   // Read in so we can check the DIP switches at startup.
@@ -676,8 +679,8 @@ void setup()
   debug_mode_aux = (digitalRead(dipSwPin[DIP_SW_AUX_MCU_DEBUG]) == 0);
 
   if (!debug_mode) {
-    // Use USB serial for MIDI (and at 1.25Mb/s)
-    midiUSB.begin(&setLed, &handleRxMidi, 1250000);
+    // Use USB serial for MIDI (and at 1Mb/s)
+    midiUSB.begin(&setLed, &handleRxMidi, 1000000);
   } else {
     // Initialize serial UART for debug output.
 #if ! FORCE_DEBUG

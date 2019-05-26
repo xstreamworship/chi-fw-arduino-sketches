@@ -33,6 +33,7 @@ class CMidiPort
     };
     bool parseMidi(uint8_t rxByte, uint8_t channel)
     {
+      bool rc = false;
       uint8_t rxStatus = rxByte & 0xf0;
       uint8_t rxChannel = rxByte & 0x0f;
       if (rxByte < 0x80) {
@@ -43,6 +44,7 @@ class CMidiPort
             if (m_handleRxMidi)
               m_handleRxMidi(0xb0, m_rxData1, rxByte, channel);
             m_rxData1 = 255;
+            rc = true;
           } else {
             // Store the received CC number
             m_rxData1 = rxByte;
@@ -52,12 +54,14 @@ class CMidiPort
           if (m_handleRxMidi)
             m_handleRxMidi(0xc0, rxByte, 0, channel);
           m_rxRunningStatus = 255;
+          rc = true;
         } else if (m_rxRunningStatus == 0xe0) {
           if (m_rxData1 != 255) {
             // Invoke the callback.
             if (m_handleRxMidi)
               m_handleRxMidi(0xe0, m_rxData1, rxByte, channel);
             m_rxData1 = 255;
+            rc = true;
           } else {
             // Store the received byte.
             m_rxData1 = rxByte;
@@ -83,6 +87,7 @@ class CMidiPort
         m_rxRunningStatus = 255;
         m_rxData1 = 255;
       }
+      return rc;
     }
   public:
     inline CMidiPort(SerialPort& serialPort) :
@@ -148,8 +153,7 @@ class CMidiPort
           } else if ((data & 0xf0) == 0) {
             // Cable change escape sequence.
             m_rxCable = (data & 0x0f);
-            if ((cableMask & (1 << m_rxCable)) == 0)
-              return count;
+            return count;
           }
           // Otherwise ignore the unrecognized escape sequence.
         } else if (data == 0xfd) {
@@ -215,10 +219,10 @@ class CMidiPort
     {
       uint8_t data = 0;
       while (read(&data, sizeof(data), cableMask) && --polls) {
-        if (!parseMidi(data, channel))
-          return false;
+        if (parseMidi(data, channel))
+          return true;
       }
-      return true;
+      return false;
     }
     inline void receiveFlush(uint16_t cableMask = 0)
     {

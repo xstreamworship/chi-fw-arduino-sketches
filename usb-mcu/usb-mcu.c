@@ -99,12 +99,6 @@ static struct {
   uchar rx_buf[RX_SIZE];	/* tempory buffer */
 } RxCableDesc[RX_CABLE_DESCS] = { 0 };
 
-
-#define    TX_SIZE        (HW_CDC_BULK_OUT_SIZE<<2)
-#define    TX_MASK        (TX_SIZE-1)
-static uchar uwptr = 0, irptr = 0;
-static uchar tx_buf[TX_SIZE];
-
 /** LUFA CDC Class driver interface configuration and state information. This structure is
  *  passed to all CDC Class driver functions, so that multiple instances of the same class
  *  within a device can be differentiated from one another.
@@ -142,7 +136,7 @@ USB_ClassInfo_MIDI_Device_t Keyboard_MIDI_Interface =  {
   },
 };
 
-void parseUSBMidiMessage(uchar *data, uchar len) {
+void parseUSBMidiMessage(uchar *data) {
   static uchar cable = 0;
   uchar in_cable = (*data) >> 4;
   uchar cin = (*data) & 0x0f;	/* code index number */
@@ -150,8 +144,8 @@ void parseUSBMidiMessage(uchar *data, uchar len) {
 
   if (in_cable != cable) {
     /* The cable has changed, so issue an escape sequence. */
-    tx_buf[uwptr++] = 0xfd; /* Escape. */
-    tx_buf[uwptr++] = 0x00 + in_cable; /* Change cable ID (USB to serial direction). */
+    RingBuffer_Insert(&USBtoUSART_Buffer, 0xfd ); /* Escape. */
+    RingBuffer_Insert(&USBtoUSART_Buffer, 0x00 + in_cable ); /* Change cable ID (USB to serial direction). */
     cable = in_cable;
   }
 
@@ -159,10 +153,9 @@ void parseUSBMidiMessage(uchar *data, uchar len) {
     for (i = 1 ; i < 4 ; i++) {
       if (*(data + i) == 0xfd) {
         /* This means that hereto undefined MIDI 0xfd is actually in use. */
-        tx_buf[uwptr++] = 0xfd; /* Escape it. */
+        RingBuffer_Insert(&USBtoUSART_Buffer, 0xfd ); /* Escape it. */
       }
-      tx_buf[uwptr++] = *(data + i); /* copy to buffer */
-      uwptr &= TX_MASK;
+      RingBuffer_Insert(&USBtoUSART_Buffer, *(data + i) ); /* copy to buffer */
       if (i == 1) {
 	if ((cin == 5) || /* single byte system common */
 	    (cin == 15))  /* single byte */
@@ -176,10 +169,6 @@ void parseUSBMidiMessage(uchar *data, uchar len) {
 	  break;
       }
     }
-  }
-
-  if (len > 4) {
-    parseUSBMidiMessage(data+4, len-4);
   }
 }
 
@@ -308,38 +297,45 @@ void processMIDI() {
 #define CNTMAX 40
   static uint8_t cnt = CNTMAX;
 
+  RingBuffer_InitBuffer(&USBtoUSART_Buffer);
+  RingBuffer_InitBuffer(&USARTtoUSB_Buffer);
+
   sei();
 
   for (;;){
     /* receive from Serial MIDI line */
-    if( UCSR1A & (1<<RXC1)) {
-      utxrdy |= parseSerialMidiMessage(UDR1);
+    while ( !utxrdy && !RingBuffer_IsEmpty(&USARTtoUSB_Buffer) ) {
+      utxrdy |= parseSerialMidiMessage(RingBuffer_Remove(&USARTtoUSB_Buffer));
       LEDs_TurnOnLEDs(LEDMASK_TX);
       PulseMSRemaining.TxLEDPulse = TX_RX_LED_PULSE_MS;
     }
 
     /* send packets to USB MIDI */
-    if( utxrdy ) {
+    if ( utxrdy ) {
       MIDI_Device_SendEventPacket(&Keyboard_MIDI_Interface, (MIDI_EventPacket_t *)&utx_buf);
       MIDI_Device_Flush(&Keyboard_MIDI_Interface);
       utxrdy = FALSE;
     }
 
     /* receive from USB MIDI */
+// Buffer reserve is large enough to ensure that parseUSBMidiMessage() doesn't run out
+// of space while translating a USB MIDI message to the multiplexed serial MIDI.
+#define BUFFER_RESERVE 8
     MIDI_EventPacket_t ReceivedMIDIEvent;
-    while (MIDI_Device_ReceiveEventPacket(&Keyboard_MIDI_Interface, &ReceivedMIDIEvent)) {
+    while ((RingBuffer_GetCount(&USBtoUSART_Buffer) < (BUFFER_SIZE - BUFFER_RESERVE)) &&
+      MIDI_Device_ReceiveEventPacket(&Keyboard_MIDI_Interface, &ReceivedMIDIEvent)) {
       /* for each MIDI packet w/ 4 bytes */
-      parseUSBMidiMessage((uchar *)&ReceivedMIDIEvent, 4);
+      parseUSBMidiMessage((uchar *)&ReceivedMIDIEvent);
       LEDs_TurnOnLEDs(LEDMASK_RX);
       PulseMSRemaining.RxLEDPulse = TX_RX_LED_PULSE_MS;
     }
-      
+
     /* send to Serial MIDI line  */
-    if( (UCSR1A & (1<<UDRE1)) && uwptr!=irptr ) {
-      UDR1 = tx_buf[irptr++];
-      irptr &= TX_MASK;
+    if ((UCSR1A & (1<<UDRE1)) &&
+      !(RingBuffer_IsEmpty(&USBtoUSART_Buffer))) {
+      UDR1 = RingBuffer_Remove(&USBtoUSART_Buffer);
     }
-    
+
     if (TIFR0 & (1 << TOV0)) {
       TIFR0 |= (1 << TOV0);
       /* Turn off TX LED(s) once the TX pulse period has elapsed */
@@ -543,11 +539,10 @@ void EVENT_CDC_Device_LineEncodingChanged(USB_ClassInfo_CDC_Device_t* const CDCI
  *  for later transmission to the host.
  */
 ISR(USART1_RX_vect, ISR_BLOCK) {
-  if (systemMode == 0) {
-    uint8_t ReceivedByte = UDR1;
+  uint8_t ReceivedByte = UDR1;
 
-    if (USB_DeviceState == DEVICE_STATE_Configured)
-      RingBuffer_Insert(&USARTtoUSB_Buffer, ReceivedByte);
+  if (USB_DeviceState == DEVICE_STATE_Configured) {
+    RingBuffer_Insert(&USARTtoUSB_Buffer, ReceivedByte);
   }
 }
 

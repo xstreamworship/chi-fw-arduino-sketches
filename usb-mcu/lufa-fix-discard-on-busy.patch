@@ -1,0 +1,32 @@
+Roughly equivalent to ...
+commit ee495ca5002da26bae51a95d1922474708a2e818
+Date:   Wed Nov 3 03:20:08 2010 +0000
+    Fixed MIDI class driver send routines silently discarding packets if the endpoint or pipe is busy (thanks to Robin Green).
+
+--- lufa-100807/LUFA/Drivers/USB/Class/Device/MIDI.c.theorig	2019-05-20 13:55:24.727236767 -0700
++++ lufa-100807/LUFA/Drivers/USB/Class/Device/MIDI.c	2019-05-20 13:58:24.378282768 -0700
+@@ -68,18 +68,15 @@ uint8_t MIDI_Device_SendEventPacket(USB_
+ 	if (USB_DeviceState != DEVICE_STATE_Configured)
+ 	  return ENDPOINT_RWSTREAM_DeviceDisconnected;
+ 	
+-	Endpoint_SelectEndpoint(MIDIInterfaceInfo->Config.DataINEndpointNumber);
++	uint8_t ErrorCode;
+ 
+-	if (Endpoint_IsReadWriteAllowed())
+-	{
+-		uint8_t ErrorCode;
++	Endpoint_SelectEndpoint(MIDIInterfaceInfo->Config.DataINEndpointNumber);
+ 
+-		if ((ErrorCode = Endpoint_Write_Stream_LE(Event, sizeof(MIDI_EventPacket_t), NO_STREAM_CALLBACK)) != ENDPOINT_RWSTREAM_NoError)
+-		  return ErrorCode;
++	if ((ErrorCode = Endpoint_Write_Stream_LE(Event, sizeof(MIDI_EventPacket_t), NO_STREAM_CALLBACK)) != ENDPOINT_RWSTREAM_NoError)
++	  return ErrorCode;
+ 
+-		if (!(Endpoint_IsReadWriteAllowed()))
+-		  Endpoint_ClearIN();
+-	}
++	if (!(Endpoint_IsReadWriteAllowed()))
++	  Endpoint_ClearIN();
+ 	
+ 	return ENDPOINT_RWSTREAM_NoError;
+ }

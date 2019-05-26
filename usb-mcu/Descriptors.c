@@ -457,7 +457,7 @@ const USB_Descriptor_ConfigurationMIDI_t PROGMEM ConfigurationDescriptorMIDI =
 					.EndpointAddress     = (ENDPOINT_DESCRIPTOR_DIR_OUT | MIDI_STREAM_OUT_EPNUM),
 					.Attributes          = (EP_TYPE_BULK | ENDPOINT_ATTR_NO_SYNC | ENDPOINT_USAGE_DATA),
 					.EndpointSize        = MIDI_STREAM_EPSIZE,
-					.PollingIntervalMS   = 0
+					.PollingIntervalMS   = 0x00
 				},
 
 			.Refresh                  = 0,
@@ -482,7 +482,7 @@ const USB_Descriptor_ConfigurationMIDI_t PROGMEM ConfigurationDescriptorMIDI =
 					.EndpointAddress     = (ENDPOINT_DESCRIPTOR_DIR_IN | MIDI_STREAM_IN_EPNUM),
 					.Attributes          = (EP_TYPE_BULK | ENDPOINT_ATTR_NO_SYNC | ENDPOINT_USAGE_DATA),
 					.EndpointSize        = MIDI_STREAM_EPSIZE,
-					.PollingIntervalMS   = 0
+					.PollingIntervalMS   = 0x00
 				},
 
 			.Refresh                  = 0,
